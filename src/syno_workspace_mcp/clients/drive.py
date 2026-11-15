@@ -7,6 +7,7 @@ parameter values are JSON-encoded, move and delete run as background tasks.
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import json
 import re
 import time
@@ -182,6 +183,26 @@ class _RawFileList(BaseModel):
 
     total: int = 0
     items: list[_RawFile] = Field(default_factory=list)
+
+
+_EXTENSION_GLOB = re.compile(r"\*\.([A-Za-z0-9]+)")
+
+
+def _list_filter(
+    file_type: FileType, pattern: str | None
+) -> tuple[dict[str, list[str]], str | None]:
+    """Drive's `filter` for Files.list, plus a glob Drive cannot apply (matched locally).
+
+    Verified on the NAS: `type` only works as a list, `pattern` is ignored, and
+    `extensions` filters files but lets every folder through.
+    """
+    list_filter: dict[str, list[str]] = {"type": [file_type]} if file_type != "all" else {}
+    if pattern is None:
+        return list_filter, None
+    match = _EXTENSION_GLOB.fullmatch(pattern.strip())
+    if match and file_type != "dir":
+        return {"type": ["file"], "extensions": [match[1].lower()]}, None
+    return list_filter, pattern
 
 
 # Output shapes (same fields as upstream) ------------------------------------
@@ -582,12 +603,16 @@ class DriveClient:
             "sort_by": sort_by,
             "sort_direction": sort_direction,
         }
-        if file_type != "all":
-            params["filter"] = json.dumps({"type": file_type})
-        if pattern is not None:
-            params["pattern"] = pattern
+        list_filter, local_glob = _list_filter(file_type, pattern)
+        if list_filter:
+            params["filter"] = json.dumps(list_filter)
         data = await self._dsm.call(FILES_API, "list", FILES_VERSION, params)
-        return _parse(_RawFileList, data, "list")
+        raw = _parse(_RawFileList, data, "list")
+        if local_glob is None:
+            return raw
+        glob = local_glob.lower()
+        items = [item for item in raw.items if fnmatch.fnmatchcase(item.name.lower(), glob)]
+        return _RawFileList(total=len(items), items=items)
 
     async def _get_raw(self, ref: str) -> _RawFile:
         data = await self._dsm.call(FILES_API, "get", FILES_VERSION, {"path": ref})

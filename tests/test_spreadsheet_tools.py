@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from pathlib import Path
 from typing import Any
 
@@ -267,8 +268,8 @@ async def test_list_falls_back_to_registry_without_permanent_link(
     result = await call(mcp, "spreadsheet_list", {"folder_path": "/team-folders/labs"})
 
     params = fake_dsm.entry_params()
-    assert params["pattern"] == "*.osheet"
-    assert params["filter"] == '{"type": "file"}'
+    assert "pattern" not in params
+    assert json.loads(params["filter"]) == {"type": ["file"], "extensions": ["osheet"]}
     assert params["limit"] == "50"
     osheets = [f for f in result["files"] if f["path"].endswith(".osheet")]
     assert osheets
@@ -287,7 +288,8 @@ async def test_read_sheet_defaults_to_first_sheet_and_used_area(
     assert result == {
         "file_id": SID,
         "sheet_name": "Sheet1",
-        "range": "A1:C3",
+        # The used area, not the grid that was read.
+        "range": "A1:C2",
         "headers": ["Name", "Age", "City"],
         "rows": [["Alice", 30, "Paris"]],
         "total_rows": 1,
@@ -306,6 +308,33 @@ async def test_read_sheet_with_explicit_range_skips_info_and_keeps_shape(
 
     assert len(fake_ss.calls) == 1
     assert result["rows"] == [["Alice", 30, "Paris"], ["", None, ""]]
+
+
+async def test_read_sheet_keeps_empty_header_cells_as_null(
+    mcp: FastMCP, fake_ss: FakeSpreadsheetApi
+) -> None:
+    values = {"range": "A1:D2", "values": [["Name", None, "", "City"], ["a", 1, 2, "b"]]}
+    fake_ss.on("GET", f"{BASE}/values/Sheet1%21A1%3AD2", httpx.Response(200, json=values))
+
+    result = await call(
+        mcp, "spreadsheet_read_sheet", {"file_id": SID, "sheet_name": "Sheet1", "range": "A1:D2"}
+    )
+
+    # Same convention as the rows: an empty cell is null, an empty string stays "".
+    assert result["headers"] == ["Name", None, "", "City"]
+
+
+async def test_read_sheet_of_an_empty_sheet(mcp: FastMCP, fake_ss: FakeSpreadsheetApi) -> None:
+    fake_ss.on("GET", BASE, fixture("ss_get_info.json"))
+    fake_ss.on(
+        "GET", f"{BASE}/values/Sheet1%21A1%3AC3", httpx.Response(200, json={"values": [[], []]})
+    )
+
+    result = await call(mcp, "spreadsheet_read_sheet", {"file_id": SID})
+
+    assert result["range"] == "A1"
+    assert result["headers"] == []
+    assert result["rows"] == []
 
 
 async def test_read_sheet_unknown_sheet_lists_names(

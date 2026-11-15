@@ -95,7 +95,7 @@ class SheetData(BaseModel):
     file_id: str
     sheet_name: str
     range: str
-    headers: list[str] = Field(description="First row of the range")
+    headers: list[str | None] = Field(description="First row of the range; null = empty cell")
     rows: list[list[CellValue]] = Field(description="Rows after the first one")
     total_rows: int
     total_cols: int
@@ -383,7 +383,10 @@ def register_spreadsheet_tools(mcp: FastMCP) -> None:
             raise to_tool_error(error) from error
         if trim:
             values = _trim(values)
-        headers = ["" if cell is None else str(cell) for cell in (values[0] if values else [])]
+            # Report the used area rather than the whole allocated grid that was read.
+            width = max((len(row) for row in values), default=0)
+            read_range = block_range("A1", len(values), width) if width else "A1"
+        headers = [None if cell is None else str(cell) for cell in (values[0] if values else [])]
         rows = values[1:]
         return SheetData(
             file_id=spreadsheet_id,

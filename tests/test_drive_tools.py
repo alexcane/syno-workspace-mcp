@@ -103,10 +103,16 @@ async def test_list_team_folder(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
     assert len(fake_dsm.logouts) == 1  # session closed with the server lifespan
 
 
+def listed(*names: str, total: int | None = None) -> httpx.Response:
+    items = [
+        {"file_id": str(i), "name": n, "path": f"/{n}", "type": "file"} for i, n in enumerate(names)
+    ]
+    data = {"total": len(names) if total is None else total, "items": items}
+    return httpx.Response(200, json={"success": True, "data": data})
+
+
 async def test_list_with_filters(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
-    fake_dsm.entry.mock(
-        return_value=httpx.Response(200, json={"success": True, "data": {"total": 0, "items": []}})
-    )
+    fake_dsm.entry.mock(return_value=listed())
 
     result = await call(
         mcp,
@@ -118,16 +124,45 @@ async def test_list_with_filters(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
             "sort_by": "modified",
             "sort_direction": "DESC",
             "file_type": "dir",
-            "pattern": "*report*",
         },
     )
 
     params = fake_dsm.entry_params()
-    assert json.loads(params["filter"]) == {"type": "dir"}
-    assert params["pattern"] == "*report*"
+    # Verified on the NAS: Drive ignores {"type": "dir"}; the type must be a list.
+    assert json.loads(params["filter"]) == {"type": ["dir"]}
     assert params["sort_by"] == "modified"
     assert params["limit"] == "5"
     assert result == {"total": 0, "offset": 10, "files": []}
+
+
+@pytest.mark.parametrize("file_type", ["all", "file"])
+async def test_extension_glob_is_filtered_by_drive(
+    mcp: FastMCP, fake_dsm: FakeDsm, file_type: str
+) -> None:
+    fake_dsm.entry.mock(return_value=listed("a.osheet", total=7))
+
+    result = await call(
+        mcp, "drive_list_files", {"pattern": "*.OSheet", "file_type": file_type, "limit": 1}
+    )
+
+    params = fake_dsm.entry_params()
+    # Drive ignores `pattern`; `extensions` alone lets folders through, hence the type.
+    assert "pattern" not in params
+    assert json.loads(params["filter"]) == {"type": ["file"], "extensions": ["osheet"]}
+    assert result["total"] == 7
+
+
+async def test_other_globs_filter_the_fetched_page(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
+    page = listed("Q1 Report.pdf", "notes.txt", "report-2.odoc", total=40)
+    fake_dsm.entry.mock(return_value=page)
+
+    result = await call(mcp, "drive_list_files", {"pattern": "*report*"})
+
+    params = fake_dsm.entry_params()
+    assert "pattern" not in params
+    assert "filter" not in params
+    assert [f["name"] for f in result["files"]] == ["Q1 Report.pdf", "report-2.odoc"]
+    assert result["total"] == 2
 
 
 @pytest.mark.parametrize(

@@ -98,12 +98,17 @@ def register_drive_tools(mcp: FastMCP) -> None:
         sort_direction: SortDirection = "ASC",
         file_type: Annotated[FileType, Field(description="Filter by type")] = "all",
         pattern: Annotated[
-            str | None, Field(description="Glob pattern filter, e.g. '*.osheet' or '*report*'")
+            str | None,
+            Field(
+                description="Glob pattern filter, e.g. '*.osheet' or '*report*' (case-insensitive)"
+            ),
         ] = None,
     ) -> DriveFileList:
         """List files and folders in a Synology Drive path.
 
-        Supports pagination, sorting, and glob filtering.
+        Supports pagination, sorting, and glob filtering. A '*.ext' pattern is applied
+        by Drive (files only); any other pattern only filters the page that was fetched,
+        and `total` then counts the matches in that page.
         """
         try:
             return await _client(ctx).list_files(
