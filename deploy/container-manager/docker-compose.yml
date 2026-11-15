@@ -1,0 +1,48 @@
+# syno-workspace-mcp for Synology Container Manager (no SSH, no .env file).
+# Paste this file in Container Manager > Project > Create, then replace every
+# CHANGE_ME value. See docs/install-container-manager.md.
+#
+# Values: keep the double quotes. Secrets: letters, digits and hyphens only.
+# Compose reads "$" as a variable (write "$$" if your DSM password contains one).
+
+services:
+  spreadsheet-api:
+    image: synology/spreadsheet-api@sha256:f991f0146749f94f5a8268374ebb9dace498e7a5f18863e67a5934518506d5fd
+    container_name: synology-spreadsheet-api
+    restart: unless-stopped
+    # Host networking: Docker's bridge network cannot reach DSM on Synology.
+    network_mode: host
+    environment:
+      # Random string used only by this container, for example 40 characters.
+      AUTH_SECRET: "CHANGE_ME_SPREADSHEET_SECRET"
+      HOST: "127.0.0.1"
+      PORT: "3000"
+
+  mcp:
+    image: ghcr.io/alexcane/syno-workspace-mcp:1.0.0
+    container_name: syno-workspace-mcp
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      # Address you use to open DSM over HTTPS, with its port, for example
+      # https://nas.example.com:5001. Its certificate must be valid.
+      SYNO_DSM_URL: "CHANGE_ME_DSM_URL"
+      SYNO_VERIFY_TLS: "true"
+      # Dedicated DSM account (step 1 of the guide) and its password.
+      SYNO_USERNAME: "mcp_service"
+      SYNO_PASSWORD: "CHANGE_ME_DSM_PASSWORD"
+      SYNO_SS_API_URL: "http://127.0.0.1:3000"
+      SYNO_MODULES: "drive,spreadsheet"
+      MCP_HOST: "127.0.0.1"
+      MCP_PORT: "3100"
+      # Access token for Claude: another random string, at least 32 characters.
+      MCP_AUTH_TOKEN: "CHANGE_ME_ACCESS_TOKEN"
+      # Host name in the URL Claude will use, without https:// or port,
+      # for example nas.example.com.
+      MCP_ALLOWED_HOSTS: "CHANGE_ME_HOST_NAME"
+      DATA_DIR: "/data"
+      LOG_LEVEL: "INFO"
+    volumes:
+      - ./data:/data
+    depends_on:
+      - spreadsheet-api

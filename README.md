@@ -18,7 +18,11 @@ MCP server for **Synology Drive** and **Synology Spreadsheet**, built with
 
 ## Install on a Synology NAS
 
-Requires Container Manager (Docker) and SSH access.
+No terminal? Follow the step-by-step
+[Container Manager guide](docs/install-container-manager.md), done entirely in
+the DSM web interface.
+
+The commands below require Container Manager (Docker) and SSH access.
 
 ```bash
 mkdir -p /volume1/docker/syno-workspace-mcp && cd /volume1/docker/syno-workspace-mcp
