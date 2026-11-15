@@ -4,9 +4,8 @@ MCP server for **Synology Drive** and **Synology Spreadsheet**, built with
 [FastMCP](https://gofastmcp.com). Python port of
 [vocweb/synology-mcp-server](https://github.com/vocweb/synology-mcp-server).
 
-> **Status: milestone 4 (Spreadsheet).** The 11 Drive and 15 Spreadsheet tools are
-> available. Tools that overwrite, rename or delete do nothing unless called with
-> `confirm: true`.
+> **Status: v1.** The 11 Drive and 15 Spreadsheet tools are available. Tools that
+> overwrite, rename or delete do nothing unless called with `confirm: true`.
 
 ## How it runs
 
@@ -27,17 +26,44 @@ curl -fsSLO https://raw.githubusercontent.com/alexcane/syno-workspace-mcp/main/d
 curl -fsSL -o .env https://raw.githubusercontent.com/alexcane/syno-workspace-mcp/main/deploy/.env.example
 vi .env   # fill in DSM URL, account, secrets (openssl rand -hex 32), allowed hosts
 mkdir -p data && sudo chown 1000:1000 data
-sudo docker compose pull && sudo docker compose up -d
+sudo /usr/local/bin/docker compose pull && sudo /usr/local/bin/docker compose up -d   # docker is not on sudo's PATH on DSM
 curl -fsS http://127.0.0.1:3100/health
 ```
 
-Then add a DSM reverse proxy rule (HTTPS → `http://localhost:3100`, read timeout
-3600 s) and connect a client:
+Then add a DSM reverse proxy rule (*Control Panel → Login Portal → Advanced →
+Reverse Proxy*): source HTTPS `<host>:<port>`, destination `http://localhost:3100`,
+HTTP 1.1, connection/send/read timeouts 3600 s. Add `<host>` to
+`MCP_ALLOWED_HOSTS`.
+
+## Connect a client
+
+Claude Code:
 
 ```bash
 claude mcp add --scope user --transport http synology https://<host>:<port>/mcp \
   --header "Authorization: Bearer <MCP_AUTH_TOKEN>"
 ```
+
+Claude Desktop has no remote HTTP transport with a static header, so it goes
+through the [`fastmcp-remote`](https://gofastmcp.com/docs/clients/fastmcp-remote.md)
+stdio bridge (requires [uv](https://docs.astral.sh/uv/)). In
+`claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "synology": {
+      "command": "uvx",
+      "args": [
+        "fastmcp-remote", "https://<host>:<port>/mcp",
+        "--header", "Authorization: Bearer <MCP_AUTH_TOKEN>"
+      ]
+    }
+  }
+}
+```
+
+If DSM uses a certificate from a private CA, add `"--verify", "/path/to/ca.pem"`.
 
 ## Spreadsheet tools
 
@@ -81,6 +107,11 @@ uv run python -m syno_workspace_mcp --transport stdio
 
 `tests/smoke/` holds tests against a real NAS; they are excluded from the default
 run and launched by hand.
+
+## Roadmap
+
+- A `/setup` web page served by the server, to replace editing `.env` by hand
+  (exposure mode, creation of the dedicated DSM account, token generation).
 
 ## Releases
 
