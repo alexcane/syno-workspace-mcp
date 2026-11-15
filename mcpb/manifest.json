@@ -1,0 +1,58 @@
+{
+  "manifest_version": "0.3",
+  "name": "syno-workspace-mcp",
+  "display_name": "Synology Drive & Spreadsheet",
+  "version": "1.0.0",
+  "description": "Connects Claude to Synology Drive and Synology Spreadsheet through your own syno-workspace-mcp server.",
+  "long_description": "Bridge to a syno-workspace-mcp server running on your Synology NAS. Enter the server URL (for example https://nas.example.com:3443/mcp) and the access token (MCP_AUTH_TOKEN) set on the server. Tools that overwrite, rename or delete do nothing unless called with confirm: true.",
+  "author": {
+    "name": "alexcane",
+    "url": "https://github.com/alexcane"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexcane/syno-workspace-mcp"
+  },
+  "homepage": "https://github.com/alexcane/syno-workspace-mcp",
+  "documentation": "https://github.com/alexcane/syno-workspace-mcp#claude-desktop-extension",
+  "support": "https://github.com/alexcane/syno-workspace-mcp/issues",
+  "license": "MIT",
+  "keywords": ["synology", "drive", "spreadsheet", "nas"],
+  "privacy_policies": [
+    "https://github.com/alexcane/syno-workspace-mcp#privacy"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "MCP_URL": "${user_config.server_url}",
+        "MCP_TOKEN": "${user_config.access_token}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "compatibility": {
+    "platforms": ["darwin", "win32"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "user_config": {
+    "server_url": {
+      "type": "string",
+      "title": "Server URL",
+      "description": "Address of your syno-workspace-mcp server, for example https://nas.example.com:3443/mcp",
+      "required": true
+    },
+    "access_token": {
+      "type": "string",
+      "title": "Access token",
+      "description": "Value of MCP_AUTH_TOKEN on the server.",
+      "required": true,
+      "sensitive": true
+    }
+  }
+}

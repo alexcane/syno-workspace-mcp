@@ -46,3 +46,41 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  extension:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check extension version matches tag
+        run: |
+          version="$(node -p 'require("./mcpb/manifest.json").version')"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match mcpb/manifest.json version ${version}" >&2
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mcpb/package-lock.json
+
+      - name: Test and pack
+        working-directory: mcpb
+        run: |
+          npm ci
+          npm test
+          npm run pack
+
+      - name: Attach to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" mcpb/dist/*.mcpb --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" mcpb/dist/*.mcpb --title "${GITHUB_REF_NAME}" --generate-notes --verify-tag
+          fi

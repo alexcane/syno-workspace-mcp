@@ -44,6 +44,25 @@ claude mcp add --scope user --transport http synology https://<host>:<port>/mcp 
   --header "Authorization: Bearer <MCP_AUTH_TOKEN>"
 ```
 
+### Claude Desktop extension
+
+The easiest way for Claude Desktop: no terminal, nothing else to install.
+
+1. Download `syno-workspace-mcp-<version>.mcpb` from the
+   [latest release](https://github.com/alexcane/syno-workspace-mcp/releases/latest).
+2. Double-click it (or drag it onto *Settings → Extensions*). Claude Desktop
+   warns that the developer is not verified: the extension is not signed yet.
+   macOS may then ask to let Claude access the local network: allow it if the
+   server is on your LAN.
+3. Enter the server URL (`https://<host>:<port>/mcp`) and the access token
+   (`MCP_AUTH_TOKEN`). The token field is marked sensitive: Claude Desktop masks
+   it and stores it securely.
+
+The extension is a small stdio-to-HTTP bridge run by the Node.js that ships with
+Claude Desktop. It only accepts `https://` URLs (plain `http://` on localhost).
+
+### Claude Desktop without the extension
+
 Claude Desktop has no remote HTTP transport with a static header, so it goes
 through the [`fastmcp-remote`](https://gofastmcp.com/docs/clients/fastmcp-remote.md)
 stdio bridge (requires [uv](https://docs.astral.sh/uv/)). In
@@ -108,6 +127,21 @@ uv run python -m syno_workspace_mcp --transport stdio
 `tests/smoke/` holds tests against a real NAS; they are excluded from the default
 run and launched by hand.
 
+The Claude Desktop extension lives in [`mcpb/`](mcpb) (Node.js ≥ 18):
+
+```bash
+cd mcpb && npm ci
+npm test       # node:test, against an in-process MCP server
+npm run pack   # dist/syno-workspace-mcp-<version>.mcpb, production deps only
+```
+
+## Privacy
+
+The server and the extension send nothing to third parties. The extension only
+talks to the server URL you enter; the server only talks to your own DSM and to
+the Spreadsheet container on the NAS. Files and spreadsheet contents go to Claude
+only when a tool returns them.
+
 ## Roadmap
 
 - A `/setup` web page served by the server, to replace editing `.env` by hand
@@ -117,7 +151,9 @@ run and launched by hand.
 
 Pushing a tag `vX.Y.Z` matching `version` in `pyproject.toml` builds the
 `linux/amd64` image and publishes `ghcr.io/alexcane/syno-workspace-mcp:X.Y.Z`.
-No `latest` tag is published.
+No `latest` tag is published. The same tag attaches the `.mcpb` extension to the
+GitHub release; `version` in `mcpb/manifest.json` and `mcpb/package.json` must
+match too.
 
 ## License
 
