@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -13,6 +14,9 @@ Module = Literal["drive", "spreadsheet"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 MIN_TOKEN_LENGTH = 32
+
+# Placeholders shipped in deploy/.env.example and the Container Manager compose file.
+_PLACEHOLDER = re.compile(r"change[-_]me", re.IGNORECASE)
 
 
 def _split_csv(value: object) -> object:
@@ -59,6 +63,15 @@ class Settings(BaseSettings):
 
     data_dir: Path = Path("/data")
     log_level: LogLevel = "INFO"
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _reject_placeholders(cls, value: object) -> object:
+        """Fail fast on a value copied from the templates but never filled in."""
+        items = value if isinstance(value, list) else [value]
+        if any(isinstance(item, str) and _PLACEHOLDER.search(item) for item in items):
+            raise ValueError("still holds a CHANGE_ME placeholder: replace it with your own value")
+        return value
 
     @field_validator("syno_modules", "mcp_allowed_hosts", mode="before")
     @classmethod

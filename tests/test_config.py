@@ -104,3 +104,26 @@ def test_secrets_are_not_in_repr(settings: Settings, env: dict[str, str]) -> Non
 
     assert env["SYNO_PASSWORD"] not in text
     assert env["MCP_AUTH_TOKEN"] not in text
+
+
+@pytest.mark.parametrize(
+    ("variable", "value"),
+    [
+        ("SYNO_DSM_URL", "CHANGE_ME_DSM_URL"),
+        ("SYNO_PASSWORD", "change-me"),
+        ("MCP_AUTH_TOKEN", "CHANGE_ME_ACCESS_TOKEN"),
+        ("MCP_ALLOWED_HOSTS", "CHANGE_ME_HOST_NAME"),
+        ("MCP_ALLOWED_HOSTS", "drive.example.test, change_me.example.test"),
+    ],
+)
+def test_template_placeholders_are_rejected(
+    env: dict[str, str], monkeypatch: pytest.MonkeyPatch, variable: str, value: str
+) -> None:
+    monkeypatch.setenv(variable, value)
+
+    with pytest.raises(ValidationError) as exc_info:
+        load()
+
+    errors = exc_info.value.errors()
+    assert [error["loc"] for error in errors] == [(variable.lower(),)]
+    assert "CHANGE_ME placeholder" in errors[0]["msg"]
