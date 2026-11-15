@@ -97,3 +97,58 @@ class FakeDsm:
 def fake_dsm() -> Iterator[FakeDsm]:
     with respx.mock(assert_all_called=False) as router:
         yield FakeDsm(router)
+
+
+# Spreadsheet API container mock -------------------------------------------------
+
+SS_URL = "http://127.0.0.1:3000"
+SS_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJzaWQiOiJ0ZXN0In0.signature-for-tests"
+
+
+def json_body(request: httpx.Request) -> Any:
+    return json.loads(request.content.decode()) if request.content else None
+
+
+class FakeSpreadsheetApi:
+    """respx-backed `synology/spreadsheet-api`: authorize, revoke and scripted routes.
+
+    Routes are keyed by method and raw (still percent-encoded) path, so tests see
+    exactly what goes on the wire. An unscripted request answers 500.
+    """
+
+    def __init__(self, router: respx.MockRouter) -> None:
+        self.authorize_responses: list[httpx.Response] = [
+            httpx.Response(200, json={"token": SS_TOKEN})
+        ]
+        self.authorizations: list[dict[str, Any]] = []
+        self.revocations: list[httpx.Request] = []
+        self.calls: list[httpx.Request] = []
+        self._routes: dict[tuple[str, str], list[httpx.Response]] = {}
+        router.route(url__startswith=SS_URL).mock(side_effect=self._handle)
+
+    def on(self, method: str, raw_path: str, *responses: httpx.Response) -> None:
+        """Answer `responses` in order; the last one repeats."""
+        self._routes[(method, raw_path)] = list(responses)
+
+    def _handle(self, request: httpx.Request) -> httpx.Response:
+        path = request.url.raw_path.decode().split("?", 1)[0]
+        if path == "/spreadsheets/authorize":
+            self.authorizations.append(json_body(request))
+            index = min(len(self.authorizations), len(self.authorize_responses)) - 1
+            return self.authorize_responses[index]
+        if path == "/spreadsheets/authorize/token/revoke":
+            self.revocations.append(request)
+            return httpx.Response(200, json={"success": True})
+        self.calls.append(request)
+        queue = self._routes.get((request.method, path))
+        if not queue:
+            return httpx.Response(500, json={"error": f"unscripted {request.method} {path}"})
+        return queue.pop(0) if len(queue) > 1 else queue[0]
+
+    def call(self, index: int = -1) -> httpx.Request:
+        return self.calls[index]
+
+
+@pytest.fixture
+def fake_ss(fake_dsm: FakeDsm) -> FakeSpreadsheetApi:
+    return FakeSpreadsheetApi(fake_dsm.router)

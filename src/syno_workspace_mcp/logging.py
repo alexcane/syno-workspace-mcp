@@ -12,7 +12,7 @@ REDACTED = "***"
 
 # Keys whose values must never be logged, whatever the syntax around them:
 # `passwd=x`, `"password": "x"`, `_sid: x`, `SynoToken=x`, `Authorization: Bearer x`.
-_SENSITIVE_KEYS = r"passwd|password|_sid|sid|synotoken|x-syno-token|authorization|cookie"
+_SENSITIVE_KEYS = r"passwd|password|_sid|sid|synotoken|x-syno-token|token|authorization|cookie"
 _KEY_VALUE = re.compile(
     rf"""(?P<key>["']?\b(?:{_SENSITIVE_KEYS})\b["']?\s*[:=]\s*)"""
     r"""(?P<quote>["']?)"""

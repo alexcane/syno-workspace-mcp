@@ -4,9 +4,9 @@ MCP server for **Synology Drive** and **Synology Spreadsheet**, built with
 [FastMCP](https://gofastmcp.com). Python port of
 [vocweb/synology-mcp-server](https://github.com/vocweb/synology-mcp-server).
 
-> **Status: milestone 3 (Drive).** The 11 Drive tools are available; write tools
-> that can overwrite or delete (`drive_move_file`, `drive_delete_file`) do nothing
-> unless called with `confirm: true`. Spreadsheet tools land in the next milestone.
+> **Status: milestone 4 (Spreadsheet).** The 11 Drive and 15 Spreadsheet tools are
+> available. Tools that overwrite, rename or delete do nothing unless called with
+> `confirm: true`.
 
 ## How it runs
 
@@ -38,6 +38,23 @@ Then add a DSM reverse proxy rule (HTTPS → `http://localhost:3100`, read timeo
 claude mcp add --scope user --transport http synology https://<host>:<port>/mcp \
   --header "Authorization: Bearer <MCP_AUTH_TOKEN>"
 ```
+
+## Spreadsheet tools
+
+Spreadsheet tools go through the `synology/spreadsheet-api` container (started by
+the same compose file), which logs in to DSM itself at `SYNO_SS_DSM_URL`.
+
+- The DSM account needs the **Synology Office** application privilege in addition
+  to Synology Drive.
+- A spreadsheet is addressed by its Spreadsheet ID (`file_id`): the letters and
+  digits after `/oo/r/` in the Office URL, also listed by `spreadsheet_list`. The
+  full URL is accepted, Drive file IDs are not. The Drive `path` of the `.osheet`
+  works too, and so does a `name` stored with `spreadsheet_register` (kept in
+  `DATA_DIR`; `spreadsheet_create` registers the files it creates).
+- `spreadsheet_read_sheet` returns formula results; `include_formulas: true`
+  returns the formulas as typed. Dates are serial day numbers.
+- `spreadsheet_create` cannot pick a folder: the Spreadsheet API decides where
+  the file goes; move it with `drive_move_file`.
 
 ## Configuration
 

@@ -30,28 +30,22 @@ from syno_workspace_mcp.clients.drive import (
     SortDirection,
 )
 from syno_workspace_mcp.errors import SynologyError, to_tool_error
+from syno_workspace_mcp.tools.common import (
+    DESTRUCTIVE,
+    READ_ONLY,
+    WRITE,
+    Confirm,
+    require_confirm,
+)
 
 DRIVE_CLIENT_KEY = "drive"
 
-READ_ONLY = ToolAnnotations(
-    read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
-)
-
-WRITE = ToolAnnotations(
-    read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
-)
 # Creates or updates the link of the file: repeating the call gives the same result.
 SHARE = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=True
 )
-DESTRUCTIVE = ToolAnnotations(
-    read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=False
-)
 
 PathOrId = Annotated[str, Field(description="File or folder path in Drive, or a numeric file ID")]
-Confirm = Annotated[
-    bool, Field(description="Must be true to execute; otherwise nothing is changed")
-]
 
 
 class DriveDownloadResult(BaseModel):
@@ -63,12 +57,6 @@ class DriveDownloadResult(BaseModel):
 
 class DriveLabelList(BaseModel):
     labels: list[DriveLabel]
-
-
-def require_confirm(confirm: bool, operation: str) -> None:
-    """Refuse before any DSM call when the caller did not confirm."""
-    if confirm is not True:
-        raise ToolError(f"This operation requires confirm=true to execute: {operation}")
 
 
 def decode_base64(content: str) -> bytes:

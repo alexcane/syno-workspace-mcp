@@ -1,0 +1,9 @@
+{
+  "range": "A1:C3",
+  "majorDimension": "ROWS",
+  "values": [
+    ["Name", "Age", {"t": "r", "v": [{"tx": "Ci", "s": {"b": true}}, {"tx": "ty"}]}],
+    ["Alice", 30, "Paris"],
+    ["", null, ""]
+  ]
+}

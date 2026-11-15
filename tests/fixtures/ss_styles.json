@@ -1,0 +1,13 @@
+{
+  "range": "Sheet1!A1:B1",
+  "rows": [
+    {
+      "values": [
+        {"userEnteredValue": "Total", "effectiveValue": "Total", "formattedValue": "Total",
+         "userEnteredFormat": {"textFormat": {"bold": true}}, "effectiveFormat": {"textFormat": {"bold": true}}},
+        {"userEnteredValue": "=SUM(B2:B9)", "effectiveValue": 42, "formattedValue": "42",
+         "userEnteredFormat": {"numberFormat": {"pattern": "0"}}}
+      ]
+    }
+  ]
+}

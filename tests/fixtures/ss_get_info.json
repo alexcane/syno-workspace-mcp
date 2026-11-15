@@ -1,0 +1,8 @@
+{
+  "id": "AbCdEf1234567890GhIjKl",
+  "properties": {"title": "fichier_labs", "locale": "fr_FR"},
+  "sheets": [
+    {"properties": {"title": "Notes", "sheetId": "sh_2", "index": 1, "hidden": false}, "rowCount": 50, "colCount": 4},
+    {"properties": {"title": "Sheet1", "sheetId": "sh_1", "index": 0, "hidden": false}, "rowCount": 3, "colCount": 3}
+  ]
+}

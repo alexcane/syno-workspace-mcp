@@ -132,6 +132,8 @@ class _RawFile(BaseModel):
     shared: bool = False
     capabilities: dict[str, bool] = Field(default_factory=dict)
     labels: list[str | _RawLabel] = Field(default_factory=list)
+    # For an .osheet this is its Spreadsheet ID (the `/oo/r/<id>` of the Office URL).
+    permanent_link: str | None = None
 
 
 class _RawLabelDef(BaseModel):
@@ -346,23 +348,31 @@ class DriveClient:
         file_type: FileType = "all",
         pattern: str | None = None,
     ) -> DriveFileList:
-        params: Params = {
-            "path": normalize_drive_path(folder_path),
-            "offset": offset,
-            "limit": limit,
-            "sort_by": sort_by,
-            "sort_direction": sort_direction,
-        }
-        if file_type != "all":
-            params["filter"] = json.dumps({"type": file_type})
-        if pattern is not None:
-            params["pattern"] = pattern
-        data = await self._dsm.call(FILES_API, "list", FILES_VERSION, params)
-        raw = _parse(_RawFileList, data, "list")
+        raw = await self._list(
+            folder_path, limit, offset, sort_by, sort_direction, file_type, pattern
+        )
         return DriveFileList(total=raw.total, offset=offset, files=[_to_file(f) for f in raw.items])
 
     async def get_file_info(self, path: str) -> DriveFileInfo:
         return _to_file_info(await self._get_raw(normalize_path_or_id(path)))
+
+    async def list_with_links(
+        self,
+        folder_path: str,
+        *,
+        limit: int,
+        offset: int,
+        file_type: FileType = "all",
+        pattern: str | None = None,
+    ) -> tuple[int, list[tuple[DriveFile, str | None]]]:
+        """Like `list_files`, plus each item's `permanent_link`."""
+        raw = await self._list(folder_path, limit, offset, "name", "ASC", file_type, pattern)
+        return raw.total, [(_to_file(f), f.permanent_link or None) for f in raw.items]
+
+    async def get_with_link(self, path: str) -> tuple[DriveFile, str | None]:
+        """A file and its `permanent_link` (the Spreadsheet ID for an .osheet)."""
+        raw = await self._get_raw(normalize_path_or_id(path))
+        return _to_file(raw), raw.permanent_link or None
 
     async def search(
         self,
@@ -554,6 +564,30 @@ class DriveClient:
         return DriveDeleteResult(success=True)
 
     # Helpers ----------------------------------------------------------------
+
+    async def _list(
+        self,
+        folder_path: str,
+        limit: int,
+        offset: int,
+        sort_by: SortBy,
+        sort_direction: SortDirection,
+        file_type: FileType,
+        pattern: str | None,
+    ) -> _RawFileList:
+        params: Params = {
+            "path": normalize_drive_path(folder_path),
+            "offset": offset,
+            "limit": limit,
+            "sort_by": sort_by,
+            "sort_direction": sort_direction,
+        }
+        if file_type != "all":
+            params["filter"] = json.dumps({"type": file_type})
+        if pattern is not None:
+            params["pattern"] = pattern
+        data = await self._dsm.call(FILES_API, "list", FILES_VERSION, params)
+        return _parse(_RawFileList, data, "list")
 
     async def _get_raw(self, ref: str) -> _RawFile:
         data = await self._dsm.call(FILES_API, "get", FILES_VERSION, {"path": ref})

@@ -75,6 +75,25 @@ class InvalidInputError(SynologyError):
     """Input rejected locally, before any call to DSM."""
 
 
+class SpreadsheetError(SynologyError):
+    """The Spreadsheet API container failed, was unreachable or answered unexpectedly.
+
+    `status` holds the HTTP status when the container answered with an error.
+    """
+
+    def __init__(self, message: str, *, status: int | None = None) -> None:
+        super().__init__(message, api="spreadsheet-api")
+        self.status = status
+
+
+class SpreadsheetAuthError(SpreadsheetError):
+    """`POST /spreadsheets/authorize` was rejected."""
+
+
+class RegistryError(SynologyError):
+    """The local name -> Spreadsheet ID registry could not answer the lookup."""
+
+
 def message_for_code(code: int, api: str) -> str:
     if api == "SYNO.API.Auth" and code in _AUTH_MESSAGES:
         return _AUTH_MESSAGES[code]
