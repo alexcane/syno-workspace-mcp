@@ -1,0 +1,22 @@
+services:
+  spreadsheet-api:
+    image: synology/spreadsheet-api@sha256:f991f0146749f94f5a8268374ebb9dace498e7a5f18863e67a5934518506d5fd
+    container_name: synology-spreadsheet-api
+    restart: unless-stopped
+    # Host networking: Docker's bridge network cannot reach DSM on Synology.
+    network_mode: host
+    environment:
+      - AUTH_SECRET=${SS_AUTH_SECRET:?SS_AUTH_SECRET must be set in .env}
+      - HOST=127.0.0.1
+      - PORT=3000
+
+  mcp:
+    image: ghcr.io/alexcane/syno-workspace-mcp:${MCP_IMAGE_TAG:-0.1.0}
+    container_name: syno-workspace-mcp
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ./data:/data
+    depends_on:
+      - spreadsheet-api

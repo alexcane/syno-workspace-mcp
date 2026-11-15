@@ -1,0 +1,6 @@
+syno-workspace-mcp
+
+This project is a Python/FastMCP port of synology-mcp-server
+(https://github.com/vocweb/synology-mcp-server), Copyright (c) 2026 Tien Chu,
+released under the MIT License. Tool names, input schemas and the Synology API
+call sequences are derived from that project.
