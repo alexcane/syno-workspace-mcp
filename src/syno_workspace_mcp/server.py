@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 from fastmcp import FastMCP
+from fastmcp.server.lifespan import lifespan
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from syno_workspace_mcp import __version__
 from syno_workspace_mcp.auth import BearerTokenVerifier
+from syno_workspace_mcp.clients.drive import DriveClient
+from syno_workspace_mcp.clients.dsm import DsmClient
 from syno_workspace_mcp.config import Settings
+from syno_workspace_mcp.tools.drive import DRIVE_CLIENT_KEY, register_drive_tools
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +25,36 @@ MCP_PATH = "/mcp"
 HEALTH_PATH = "/health"
 
 
+def create_dsm_client(settings: Settings) -> DsmClient:
+    return DsmClient(
+        str(settings.syno_dsm_url),
+        settings.syno_username,
+        settings.syno_password,
+        verify_tls=settings.syno_verify_tls,
+    )
+
+
 def create_server(settings: Settings) -> FastMCP:
+    @lifespan
+    async def clients_lifespan(_: FastMCP) -> AsyncIterator[dict[str, Any]]:
+        # One DSM session for the whole process, closed (with logout) at shutdown.
+        async with create_dsm_client(settings) as dsm:
+            context: dict[str, Any] = {}
+            if "drive" in settings.syno_modules:
+                context[DRIVE_CLIENT_KEY] = DriveClient(dsm)
+            yield context
+
     mcp = FastMCP(
         name=SERVER_NAME,
         version=__version__,
         instructions="Tools for Synology Drive and Synology Spreadsheet on a DSM NAS.",
         auth=BearerTokenVerifier(settings.mcp_auth_token.get_secret_value()),
         mask_error_details=True,
+        lifespan=clients_lifespan,
     )
+
+    if "drive" in settings.syno_modules:
+        register_drive_tools(mcp)
 
     @mcp.custom_route(HEALTH_PATH, methods=["GET"], include_in_schema=False)
     async def health(_: Request) -> Response:
