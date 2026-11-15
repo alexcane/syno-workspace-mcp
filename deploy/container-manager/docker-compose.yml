@@ -19,7 +19,7 @@ services:
       PORT: "3000"
 
   mcp:
-    image: ghcr.io/alexcane/syno-workspace-mcp:1.0.0
+    image: ghcr.io/alexcane/syno-workspace-mcp:1.1.0
     container_name: syno-workspace-mcp
     restart: unless-stopped
     network_mode: host
