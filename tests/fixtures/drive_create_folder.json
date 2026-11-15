@@ -1,0 +1,37 @@
+{
+  "success": true,
+  "data": {
+    "access_time": 1700000000,
+    "adv_shared": false,
+    "capabilities": {
+      "can_delete": true,
+      "can_organize": true,
+      "can_read": true,
+      "can_rename": true,
+      "can_share": true,
+      "can_write": true
+    },
+    "content_type": "dir",
+    "created_time": 1700000000,
+    "display_path": "/team-folders/labs/mcp-test/sub",
+    "dsm_path": "",
+    "file_id": "900000000000000002",
+    "labels": [],
+    "modified_time": 1700000000,
+    "name": "sub",
+    "owner": {
+      "display_name": "Alice",
+      "name": "alice",
+      "nickname": "Alice",
+      "uid": 1026
+    },
+    "parent_id": "900000000000000001",
+    "path": "/mcp-test/sub",
+    "permanent_link": "PERMALINK-fixture",
+    "removed": false,
+    "revisions": 1,
+    "shared": false,
+    "size": 0,
+    "type": "dir"
+  }
+}

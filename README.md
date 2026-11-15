@@ -4,8 +4,9 @@ MCP server for **Synology Drive** and **Synology Spreadsheet**, built with
 [FastMCP](https://gofastmcp.com). Python port of
 [vocweb/synology-mcp-server](https://github.com/vocweb/synology-mcp-server).
 
-> **Status: milestone 1 (foundation).** The server starts, authenticates clients
-> and answers `/health`; Drive and Spreadsheet tools land in the next milestones.
+> **Status: milestone 3 (Drive).** The 11 Drive tools are available; write tools
+> that can overwrite or delete (`drive_move_file`, `drive_delete_file`) do nothing
+> unless called with `confirm: true`. Spreadsheet tools land in the next milestone.
 
 ## How it runs
 

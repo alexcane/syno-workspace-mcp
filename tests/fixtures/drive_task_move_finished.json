@@ -1,0 +1,35 @@
+{
+  "success": true,
+  "data": {
+    "progress": 100,
+    "status": "finished",
+    "task_id": "task-1",
+    "result": {
+      "action": "move",
+      "errors": [],
+      "names": [
+        "notes.txt"
+      ],
+      "params": {
+        "files": [
+          {
+            "path": "id:900000000000000003"
+          }
+        ],
+        "to_parent_folder": "id:900000000000000002"
+      },
+      "processed_size": 9,
+      "total_size": 9,
+      "targets": [
+        {
+          "file_id": "900000000000000003",
+          "file_size": 9,
+          "file_type": "file",
+          "name": "notes.txt",
+          "parent_id": "900000000000000002",
+          "path": "/mcp-test/sub/notes.txt"
+        }
+      ]
+    }
+  }
+}

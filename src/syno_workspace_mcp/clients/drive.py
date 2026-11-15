@@ -1,26 +1,56 @@
-"""Synology Drive client (`SYNO.SynologyDrive.Files`), read operations."""
+"""Synology Drive client (`SYNO.SynologyDrive.*`).
+
+The write operations follow the requests the Drive web UI (package 4.0.3) sends:
+parameter values are JSON-encoded, move and delete run as background tasks.
+"""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
+import time
 from datetime import UTC, datetime
 from typing import Any, Literal
+from urllib.parse import unquote
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from syno_workspace_mcp.clients.dsm import DsmClient, Params
-from syno_workspace_mcp.errors import DsmNetworkError, InvalidInputError
+from syno_workspace_mcp.clients.dsm import DsmClient, DsmUploadFile, Params
+from syno_workspace_mcp.errors import DsmApiError, DsmNetworkError, InvalidInputError
+from syno_workspace_mcp.logging import forget_secret, register_secret
 
 FILES_API = "SYNO.SynologyDrive.Files"
 FILES_VERSION = 2
+LABELS_API = "SYNO.SynologyDrive.Labels"
+LABELS_VERSION = 1
+TASKS_API = "SYNO.SynologyDrive.Tasks"
+TASKS_VERSION = 1
+ADV_SHARING_API = "SYNO.SynologyDrive.AdvanceSharing"
+ADV_SHARING_VERSION = 1
+
+FILE_NOT_FOUND = 1003
+SHARING_LINK_NOT_CREATED = 1036
+
+# Upstream recommends staying under 50 MB: the payload travels base64-encoded in MCP.
+MAX_TRANSFER_BYTES = 50 * 1024 * 1024
 
 DRIVE_ROOTS = ("/mydrive", "/team-folders")
-_FILE_ID = re.compile(r"\d+")
+_FILE_ID = re.compile(r"(?:id:)?(\d+)")
 
 SortBy = Literal["name", "size", "user", "modified", "created"]
 SortDirection = Literal["ASC", "DESC"]
 FileType = Literal["all", "file", "dir"]
+# Values seen in the Drive web UI; upstream's `skip` is not used there.
+ConflictAction = Literal["version", "autorename"]
+SharePermission = Literal["view", "download", "edit"]
+
+# Drive link roles: `previewer` cannot download, `viewer` can.
+_SHARE_ROLES: dict[str, str] = {"view": "previewer", "download": "viewer", "edit": "editor"}
+_TASK_RUNNING = frozenset({"in_progress", "waiting", "pending", "processing"})
+
+# Indirection so tests can drive the task deadline without touching the event loop clock.
+_monotonic = time.monotonic
 
 
 # Path guard -----------------------------------------------------------------
@@ -43,11 +73,29 @@ def normalize_drive_path(path: str) -> str:
 
 
 def normalize_path_or_id(value: str) -> str:
-    """Accept a Drive path or a numeric file ID (passed through unchanged)."""
+    """Accept a Drive path or a file ID (`123` or `id:123`); IDs become `id:123`."""
     stripped = value.strip()
-    if _FILE_ID.fullmatch(stripped):
-        return stripped
+    match = _FILE_ID.fullmatch(stripped)
+    if match:
+        return f"id:{match[1]}"
     return normalize_drive_path(stripped)
+
+
+def validate_name(name: str) -> str:
+    """A single path segment: no separator, no `.`/`..`."""
+    cleaned = name.strip()
+    if not cleaned:
+        raise InvalidInputError("name must not be empty")
+    if "/" in cleaned or "\\" in cleaned:
+        raise InvalidInputError("name must not contain '/' or '\\'")
+    if cleaned in (".", ".."):
+        raise InvalidInputError("name must not be '.' or '..'")
+    return cleaned
+
+
+def _j(value: object) -> str:
+    """Drive APIs declare `requestFormat: JSON`: each value is parsed as JSON."""
+    return json.dumps(value)
 
 
 # Raw DSM shapes (tolerant) --------------------------------------------------
@@ -79,10 +127,52 @@ class _RawFile(BaseModel):
     size: int = 0
     modified_time: int | None = None
     created_time: int | None = None
+    parent_id: str | None = None
     owner: _RawOwner | None = None
     shared: bool = False
     capabilities: dict[str, bool] = Field(default_factory=dict)
     labels: list[str | _RawLabel] = Field(default_factory=list)
+
+
+class _RawLabelDef(BaseModel):
+    model_config = ConfigDict(extra="allow", coerce_numbers_to_str=True)
+
+    label_id: str
+    name: str
+    color: str = ""
+
+
+class _RawLabelList(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    items: list[_RawLabelDef] = Field(default_factory=list)
+
+
+class _RawTaskTarget(BaseModel):
+    model_config = ConfigDict(extra="allow", coerce_numbers_to_str=True)
+
+    file_id: str
+
+
+class _RawTaskResult(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    errors: list[Any] | None = None
+    targets: list[_RawTaskTarget] = Field(default_factory=list)
+
+
+class _RawTask(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    status: str
+    result: _RawTaskResult = Field(default_factory=_RawTaskResult)
+
+
+class _RawSharing(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    sharing_link: str
+    url: str | None = None
 
 
 class _RawFileList(BaseModel):
@@ -133,6 +223,51 @@ class DriveFileList(BaseModel):
     total: int
     offset: int
     files: list[DriveFile]
+
+
+class DriveUploadResult(BaseModel):
+    success: bool
+    file_id: str
+    file_path: str
+    file_name: str
+
+
+class DriveDownload(BaseModel):
+    file_name: str
+    mime_type: str
+    content: bytes
+
+
+class DriveFolderResult(BaseModel):
+    success: bool
+    folder_id: str
+    folder_path: str
+
+
+class DriveMoveResult(BaseModel):
+    dry_run: bool
+    success: bool
+    new_path: str
+
+
+class DriveDeleteResult(BaseModel):
+    success: bool
+
+
+class DriveLabel(BaseModel):
+    id: str
+    name: str
+    color: str = Field(description="Hex color as stored by Drive, e.g. '#DCE1E6'")
+
+
+class DriveLabelResult(BaseModel):
+    success: bool
+
+
+class DriveSharingLinkResult(BaseModel):
+    link: str
+    permission: SharePermission
+    expires_at: str | None
 
 
 def _iso(timestamp: int | None) -> str:
@@ -193,8 +328,12 @@ def _parse[T: BaseModel](model: type[T], data: dict[str, Any], what: str) -> T:
 
 
 class DriveClient:
-    def __init__(self, dsm: DsmClient) -> None:
+    def __init__(
+        self, dsm: DsmClient, *, poll_interval: float = 0.5, task_timeout: float = 120.0
+    ) -> None:
         self._dsm = dsm
+        self._poll_interval = poll_interval
+        self._task_timeout = task_timeout
 
     async def list_files(
         self,
@@ -223,9 +362,7 @@ class DriveClient:
         return DriveFileList(total=raw.total, offset=offset, files=[_to_file(f) for f in raw.items])
 
     async def get_file_info(self, path: str) -> DriveFileInfo:
-        params: Params = {"path": normalize_path_or_id(path)}
-        data = await self._dsm.call(FILES_API, "get", FILES_VERSION, params)
-        return _to_file_info(_parse(_RawFile, data, "get"))
+        return _to_file_info(await self._get_raw(normalize_path_or_id(path)))
 
     async def search(
         self,
@@ -247,3 +384,258 @@ class DriveClient:
         data = await self._dsm.call(FILES_API, "search", FILES_VERSION, params)
         raw = _parse(_RawFileList, data, "search")
         return DriveFileList(total=raw.total, offset=0, files=[_to_file(f) for f in raw.items])
+
+    # Write operations -------------------------------------------------------
+
+    async def create_folder(
+        self, folder_path: str, name: str, *, force_parent: bool = False
+    ) -> DriveFolderResult:
+        parent = normalize_drive_path(folder_path)
+        folder_name = validate_name(name)
+        if force_parent:
+            await self._ensure_folder(parent)
+        raw = await self._create_folder(f"{parent}/{folder_name}")
+        return DriveFolderResult(
+            success=True, folder_id=raw.file_id, folder_path=raw.display_path or raw.path
+        )
+
+    async def upload(
+        self,
+        dest_folder_path: str,
+        file_name: str,
+        content: bytes,
+        *,
+        mime_type: str = "application/octet-stream",
+        conflict_action: ConflictAction = "version",
+    ) -> DriveUploadResult:
+        dest = normalize_drive_path(dest_folder_path)
+        name = validate_name(file_name)
+        # Multipart fields are sent as plain strings, like the web UI does.
+        fields = {"path": f"{dest}/{name}", "type": "file", "conflict_action": conflict_action}
+        data = await self._dsm.upload(
+            FILES_API,
+            "upload",
+            FILES_VERSION,
+            fields,
+            DsmUploadFile(name=name, content=content, mime_type=mime_type),
+            max_bytes=MAX_TRANSFER_BYTES,
+        )
+        raw = _parse(_RawFile, data, "upload")
+        return DriveUploadResult(
+            success=True,
+            file_id=raw.file_id,
+            file_path=raw.display_path or raw.path,
+            file_name=raw.name,
+        )
+
+    async def download(self, path: str) -> DriveDownload:
+        ref = normalize_path_or_id(path)
+        params: Params = {
+            "files": _j([ref]),
+            "force_download": "true",
+            "json_error": "true",
+            "download_type": _j("download"),
+        }
+        result = await self._dsm.download(
+            FILES_API, "download", FILES_VERSION, params, max_bytes=MAX_TRANSFER_BYTES
+        )
+        fallback = ref.rsplit("/", 1)[-1] if not ref.startswith("id:") else "download"
+        return DriveDownload(
+            file_name=_filename(result.content_disposition) or fallback,
+            mime_type=result.content_type.split(";", 1)[0].strip(),
+            content=result.content,
+        )
+
+    async def list_labels(self) -> list[DriveLabel]:
+        data = await self._dsm.call(LABELS_API, "list", LABELS_VERSION, {}, http_method="POST")
+        raw = _parse(_RawLabelList, data, "list_labels")
+        return [
+            DriveLabel(id=item.label_id, name=item.name, color=item.color) for item in raw.items
+        ]
+
+    async def add_label(self, path: str, label_name: str) -> DriveLabelResult:
+        ref = normalize_path_or_id(path)
+        wanted = label_name.strip()
+        if not wanted:
+            raise InvalidInputError("label_name must not be empty")
+        labels = await self.list_labels()
+        matches = [label for label in labels if label.name == wanted] or [
+            label for label in labels if label.name.casefold() == wanted.casefold()
+        ]
+        if len(matches) != 1:
+            available = ", ".join(sorted(label.name for label in labels)) or "none"
+            reason = "is ambiguous" if matches else "does not exist"
+            raise InvalidInputError(f"label {wanted!r} {reason}; available labels: {available}")
+        params: Params = {
+            "files": _j([ref]),
+            "labels": _j([{"action": "add", "label_id": matches[0].id}]),
+        }
+        await self._dsm.call(FILES_API, "label", FILES_VERSION, params, http_method="POST")
+        return DriveLabelResult(success=True)
+
+    async def get_sharing_link(
+        self,
+        path: str,
+        *,
+        permission: SharePermission = "view",
+        password: str | None = None,
+        expire_days: int | None = None,
+    ) -> DriveSharingLinkResult:
+        ref = normalize_path_or_id(path)
+        if password:
+            register_secret(password)
+        try:
+            sharing = await self._get_or_create_sharing(ref)
+            due_date = int(time.time()) + expire_days * 86400 if expire_days else 0
+            # Always send password and expiry so the link matches this request exactly:
+            # an empty password and a zero due date remove a previous protection.
+            params: Params = {
+                "path": _j(ref),
+                "sharing_link": _j(sharing.sharing_link),
+                "role": _j(_SHARE_ROLES[permission]),
+                "protect_password": _j(password or ""),
+                "due_date": due_date,
+            }
+            await self._dsm.call(
+                ADV_SHARING_API, "update", ADV_SHARING_VERSION, params, http_method="POST"
+            )
+        finally:
+            if password:
+                forget_secret(password)
+        if not sharing.url:
+            raise DsmNetworkError("DSM did not return the sharing link URL", api=ADV_SHARING_API)
+        return DriveSharingLinkResult(
+            link=sharing.url, permission=permission, expires_at=_iso(due_date) or None
+        )
+
+    async def move(
+        self,
+        path: str,
+        dest_folder_path: str,
+        *,
+        new_name: str | None = None,
+        conflict_action: ConflictAction = "autorename",
+    ) -> DriveMoveResult:
+        source = await self._get_raw(normalize_path_or_id(path))
+        dest = await self._get_raw(normalize_path_or_id(dest_folder_path))
+        if dest.type != "dir":
+            raise InvalidInputError("dest_folder_path must be a folder")
+        name = validate_name(new_name) if new_name is not None else None
+        same_folder = source.parent_id == dest.file_id
+        if same_folder and (name is None or name == source.name):
+            raise InvalidInputError("nothing to do: the item is already in this folder")
+
+        file_ref = f"id:{source.file_id}"
+        if not same_folder:
+            params: Params = {
+                "to_parent_folder": _j(f"id:{dest.file_id}"),
+                "files": _j([file_ref]),
+                "conflict_action": _j(conflict_action),
+            }
+            await self._run_task("move", params)
+        if name is not None and name != source.name:
+            data = await self._dsm.call(
+                FILES_API,
+                "update",
+                FILES_VERSION,
+                {"path": _j(file_ref), "name": _j(name)},
+                http_method="POST",
+            )
+            moved = _parse(_RawFile, data, "update")
+        else:
+            moved = await self._get_raw(file_ref)
+        return DriveMoveResult(
+            dry_run=False, success=True, new_path=moved.display_path or moved.path
+        )
+
+    async def delete(self, path: str, *, permanent: bool = False) -> DriveDeleteResult:
+        ref = normalize_path_or_id(path)
+        await self._run_task("delete", {"files": _j([ref]), "permanent": _j(permanent)})
+        return DriveDeleteResult(success=True)
+
+    # Helpers ----------------------------------------------------------------
+
+    async def _get_raw(self, ref: str) -> _RawFile:
+        data = await self._dsm.call(FILES_API, "get", FILES_VERSION, {"path": ref})
+        return _parse(_RawFile, data, "get")
+
+    async def _create_folder(self, path: str) -> _RawFile:
+        params: Params = {
+            "path": _j(path),
+            "type": _j("folder"),
+            "conflict_action": _j("autorename"),
+        }
+        data = await self._dsm.call(FILES_API, "create", FILES_VERSION, params, http_method="POST")
+        return _parse(_RawFile, data, "create")
+
+    async def _ensure_folder(self, path: str) -> None:
+        """Create each missing folder of `path` below its Drive root."""
+        segments = path.strip("/").split("/")
+        # `/mydrive` and `/team-folders/NAME` are roots that cannot be created.
+        depth = 1 if segments[0] == "mydrive" else 2
+        for end in range(depth + 1, len(segments) + 1):
+            current = "/" + "/".join(segments[:end])
+            try:
+                await self._get_raw(current)
+            except DsmApiError as error:
+                if error.code != FILE_NOT_FOUND:
+                    raise
+                await self._create_folder(current)
+
+    async def _get_or_create_sharing(self, ref: str) -> _RawSharing:
+        try:
+            data = await self._dsm.call(
+                ADV_SHARING_API, "get", ADV_SHARING_VERSION, {"path": _j(ref)}, http_method="POST"
+            )
+        except DsmApiError as error:
+            if error.code != SHARING_LINK_NOT_CREATED:
+                raise
+            data = await self._dsm.call(
+                ADV_SHARING_API,
+                "create",
+                ADV_SHARING_VERSION,
+                {"path": _j(ref)},
+                http_method="POST",
+            )
+        return _parse(_RawSharing, data, "sharing")
+
+    async def _run_task(self, method: str, params: Params) -> _RawTaskResult:
+        data = await self._dsm.call(FILES_API, method, FILES_VERSION, params, http_method="POST")
+        task_id = data.get("async_task_id")
+        if not isinstance(task_id, str) or not task_id:
+            raise DsmNetworkError(f"DSM did not return a task id for {method}", api=FILES_API)
+        deadline = _monotonic() + self._task_timeout
+        while True:
+            data = await self._dsm.call(
+                TASKS_API, "get", TASKS_VERSION, {"task_id": _j(task_id)}, http_method="POST"
+            )
+            task = _parse(_RawTask, data, "task")
+            if task.status == "finished":
+                if task.result.errors:
+                    raise DsmApiError(
+                        f"{method} failed: {json.dumps(task.result.errors)[:500]}", api=TASKS_API
+                    )
+                return task.result
+            if task.status not in _TASK_RUNNING:
+                raise DsmApiError(f"{method} ended with status {task.status!r}", api=TASKS_API)
+            if _monotonic() >= deadline:
+                raise DsmNetworkError(
+                    f"{method} is still running on the NAS after {self._task_timeout:.0f} s; "
+                    "check the result with drive_get_file_info",
+                    api=TASKS_API,
+                )
+            await asyncio.sleep(self._poll_interval)
+
+
+_FILENAME_STAR = re.compile(r"filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)")
+_FILENAME = re.compile(r'filename\s*=\s*(?:"([^"]*)"|([^;]+))')
+
+
+def _filename(disposition: str) -> str:
+    star = _FILENAME_STAR.search(disposition)
+    if star:
+        return unquote(star[1].strip())
+    plain = _FILENAME.search(disposition)
+    if plain:
+        return (plain[1] if plain[1] is not None else plain[2]).strip()
+    return ""

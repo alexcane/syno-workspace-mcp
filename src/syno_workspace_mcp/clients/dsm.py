@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -15,6 +16,7 @@ from syno_workspace_mcp.errors import (
     DsmApiError,
     DsmAuthError,
     DsmNetworkError,
+    InvalidInputError,
     message_for_code,
 )
 from syno_workspace_mcp.logging import forget_secret, register_secret
@@ -26,8 +28,23 @@ ENTRY_PATH = "/webapi/entry.cgi"
 AUTH_API = "SYNO.API.Auth"
 AUTH_VERSION = 6
 DEFAULT_TIMEOUT = httpx.Timeout(30.0, connect=5.0)
+TRANSFER_TIMEOUT = httpx.Timeout(60.0, connect=5.0)
 
 Params = dict[str, str | int | bool]
+
+
+@dataclass(frozen=True)
+class DsmUploadFile:
+    name: str
+    content: bytes
+    mime_type: str
+
+
+@dataclass(frozen=True)
+class DsmDownload:
+    content: bytes
+    content_type: str
+    content_disposition: str
 
 
 @dataclass(frozen=True)
@@ -105,15 +122,36 @@ class DsmClient:
     ) -> dict[str, Any]:
         """Call `api.method` on `entry.cgi` and return the `data` object."""
         query: Params = {"api": api, "version": version, "method": method, **(params or {})}
-        session = await self._get_session()
-        try:
-            return await self._send(api, query, session, http_method)
-        except DsmApiError as error:
-            if error.code not in SESSION_EXPIRED_CODES:
-                raise
-            logger.info("DSM session expired (code %s), logging in again", error.code)
-            session = await self._renew_session(session)
-            return await self._send(api, query, session, http_method)
+        return await self._with_session(
+            lambda session: self._send(api, query, session, http_method)
+        )
+
+    async def upload(
+        self,
+        api: str,
+        method: str,
+        version: int,
+        fields: dict[str, str],
+        file: DsmUploadFile,
+        *,
+        max_bytes: int,
+    ) -> dict[str, Any]:
+        """Send a multipart upload; `api`/`method`/`version` travel in the query string."""
+        if len(file.content) > max_bytes:
+            raise InvalidInputError(f"file is larger than the {max_bytes} bytes limit", api=api)
+        query: Params = {"api": api, "version": version, "method": method}
+        return await self._with_session(
+            lambda session: self._send_upload(api, query, fields, file, session)
+        )
+
+    async def download(
+        self, api: str, method: str, version: int, params: Params, *, max_bytes: int
+    ) -> DsmDownload:
+        """GET a binary payload, refusing anything larger than `max_bytes`."""
+        query: Params = {"api": api, "version": version, "method": method, **params}
+        return await self._with_session(
+            lambda session: self._send_download(api, query, session, max_bytes)
+        )
 
     async def logout(self) -> None:
         async with self._lock:
@@ -138,6 +176,17 @@ class DsmClient:
                 forget_secret(session.syno_token)
 
     # Session handling -------------------------------------------------------
+
+    async def _with_session[T](self, send: Callable[[_Session], Awaitable[T]]) -> T:
+        session = await self._get_session()
+        try:
+            return await send(session)
+        except DsmApiError as error:
+            if error.code not in SESSION_EXPIRED_CODES:
+                raise
+            logger.info("DSM session expired (code %s), logging in again", error.code)
+            session = await self._renew_session(session)
+            return await send(session)
 
     async def _get_session(self) -> _Session:
         if self._session is not None:
@@ -206,14 +255,70 @@ class DsmClient:
         except httpx.HTTPError as error:
             raise DsmNetworkError(f"cannot reach DSM ({type(error).__name__})", api=api) from error
 
-        payload = _parse(response, api)
-        if not payload.get("success"):
-            code = _error_code(payload)
-            raise DsmApiError(message_for_code(code, api), code=code, api=api)
-        data = payload.get("data", {})
-        if not isinstance(data, dict):
-            raise DsmNetworkError(f"unexpected DSM response for {api}: data is not an object")
-        return data
+        return _data(_parse(response, api), api)
+
+    async def _send_upload(
+        self,
+        api: str,
+        query: Params,
+        fields: dict[str, str],
+        file: DsmUploadFile,
+        session: _Session,
+    ) -> dict[str, Any]:
+        try:
+            response = await self._http.post(
+                ENTRY_PATH,
+                params=_encode(query),
+                data=fields,
+                files={"file": (file.name, file.content, file.mime_type)},
+                headers=session.headers(),
+                timeout=TRANSFER_TIMEOUT,
+            )
+        except httpx.TimeoutException as error:
+            raise DsmNetworkError(f"DSM did not answer in time ({api})", api=api) from error
+        except httpx.HTTPError as error:
+            raise DsmNetworkError(f"cannot reach DSM ({type(error).__name__})", api=api) from error
+        return _data(_parse(response, api), api)
+
+    async def _send_download(
+        self, api: str, query: Params, session: _Session, max_bytes: int
+    ) -> DsmDownload:
+        try:
+            async with self._http.stream(
+                "GET",
+                ENTRY_PATH,
+                params=_encode(query),
+                headers=session.headers(),
+                timeout=TRANSFER_TIMEOUT,
+            ) as response:
+                if response.status_code >= 400:
+                    raise DsmNetworkError(
+                        f"DSM answered HTTP {response.status_code} for {api}", api=api
+                    )
+                content_type = response.headers.get("content-type", "application/octet-stream")
+                if "application/json" in content_type:
+                    # With `json_error=true` DSM reports failures as a JSON envelope.
+                    await response.aread()
+                    _data(_parse(response, api), api)
+                    raise DsmNetworkError(f"DSM returned JSON instead of a file for {api}", api=api)
+                chunks: list[bytes] = []
+                size = 0
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+                    if size > max_bytes:
+                        raise DsmNetworkError(
+                            f"file is larger than the {max_bytes} bytes limit", api=api
+                        )
+                    chunks.append(chunk)
+                return DsmDownload(
+                    content=b"".join(chunks),
+                    content_type=content_type,
+                    content_disposition=response.headers.get("content-disposition", ""),
+                )
+        except httpx.TimeoutException as error:
+            raise DsmNetworkError(f"DSM did not answer in time ({api})", api=api) from error
+        except httpx.HTTPError as error:
+            raise DsmNetworkError(f"cannot reach DSM ({type(error).__name__})", api=api) from error
 
     async def _post_json(self, path: str, form: dict[str, str], api: str) -> dict[str, Any]:
         try:
@@ -235,6 +340,16 @@ def _parse(response: httpx.Response, api: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise DsmNetworkError(f"unexpected DSM response for {api}", api=api)
     return payload
+
+
+def _data(payload: dict[str, Any], api: str) -> dict[str, Any]:
+    if not payload.get("success"):
+        code = _error_code(payload)
+        raise DsmApiError(message_for_code(code, api), code=code, api=api)
+    data = payload.get("data", {})
+    if not isinstance(data, dict):
+        raise DsmNetworkError(f"unexpected DSM response for {api}: data is not an object")
+    return data
 
 
 def _error_code(payload: dict[str, Any]) -> int:

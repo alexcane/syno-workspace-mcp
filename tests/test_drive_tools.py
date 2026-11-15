@@ -209,7 +209,8 @@ async def test_get_file_info_by_id(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
 
     await call(mcp, "drive_get_file_info", {"path": " 882614125167948800 "})
 
-    assert fake_dsm.entry_params()["path"] == "882614125167948800"
+    # DSM addresses files by ID with the `id:` prefix, as the Drive web UI does.
+    assert fake_dsm.entry_params()["path"] == "id:882614125167948800"
 
 
 async def test_get_file_info_defaults_for_sparse_entries(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
@@ -289,7 +290,8 @@ def test_normalize_drive_path(raw: str, expected: str) -> None:
 
 
 def test_normalize_path_or_id() -> None:
-    assert normalize_path_or_id("123") == "123"
+    assert normalize_path_or_id("123") == "id:123"
+    assert normalize_path_or_id("id:123") == "id:123"
     assert normalize_path_or_id("/mydrive/a/") == "/mydrive/a"
     with pytest.raises(InvalidInputError):
         normalize_path_or_id("12a")

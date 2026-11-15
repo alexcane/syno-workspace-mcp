@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "data": {
+    "due_date": 0,
+    "permanent_id": 900000000000000003,
+    "protect_password": "",
+    "role": "viewer",
+    "sharing_link": "LINK-fixture-0001",
+    "uid": 1026,
+    "url": "https://nas.example.test/d/s/PERMALINK-fixture/LINK-fixture-0001"
+  }
+}

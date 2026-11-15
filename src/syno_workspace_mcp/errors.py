@@ -29,8 +29,11 @@ _AUTH_MESSAGES: dict[int, str] = {
     "(Control Panel > Security > Protection)",
 }
 
-# Codes returned by SYNO.SynologyDrive.* as mapped by the upstream project.
+# Codes returned by SYNO.SynologyDrive.*: 1003 and 1036 observed on DSM 7.x with
+# Drive 4.0.3, the others as mapped by the upstream project.
 _DRIVE_MESSAGES: dict[int, str] = {
+    1003: "file or folder not found",
+    1036: "no sharing link exists for this file",
     408: "file or folder not found",
     414: "no write permission on this file or folder",
     417: "a file or folder with this name already exists",

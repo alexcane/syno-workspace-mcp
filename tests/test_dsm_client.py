@@ -8,8 +8,13 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from syno_workspace_mcp.clients.dsm import DsmClient
-from syno_workspace_mcp.errors import DsmApiError, DsmAuthError, DsmNetworkError
+from syno_workspace_mcp.clients.dsm import DsmClient, DsmUploadFile
+from syno_workspace_mcp.errors import (
+    DsmApiError,
+    DsmAuthError,
+    DsmNetworkError,
+    InvalidInputError,
+)
 from syno_workspace_mcp.logging import RedactionFilter
 
 from .conftest import DSM_URL, TEST_PASSWORD, FakeDsm
@@ -306,3 +311,90 @@ async def test_no_secret_in_logs_during_session_lifecycle(
     assert "logged in to DSM" in text
     for secret in (TEST_PASSWORD, "SID-fixture-0001", "TOKEN-fixture-0001"):
         assert secret not in text
+
+
+# Transfers ------------------------------------------------------------------
+
+UPLOAD = DsmUploadFile(name="a.txt", content=b"abc", mime_type="text/plain")
+
+
+async def test_upload_relogs_on_expired_session(dsm: DsmClient, fake_dsm: FakeDsm) -> None:
+    fake_dsm.entry.mock(side_effect=[syno_error(119), OK])
+
+    data = await dsm.upload(API, "upload", 2, {"path": "/mydrive/a.txt"}, UPLOAD, max_bytes=10)
+
+    assert data == {"value": 1}
+    assert len(fake_dsm.logins) == 2
+    request = fake_dsm.entry.calls[-1].request
+    assert request.headers["Cookie"] == "id=SID-fixture-0001"
+    assert b'filename="a.txt"' in request.content
+
+
+async def test_upload_refuses_oversized_file_before_login(
+    dsm: DsmClient, fake_dsm: FakeDsm
+) -> None:
+    with pytest.raises(InvalidInputError, match="limit"):
+        await dsm.upload(API, "upload", 2, {}, UPLOAD, max_bytes=2)
+    assert fake_dsm.logins == []
+
+
+@pytest.mark.parametrize(
+    "error", [httpx.ConnectError("refused"), httpx.ReadTimeout("slow")], ids=["connect", "timeout"]
+)
+async def test_transfer_transport_errors(
+    dsm: DsmClient, fake_dsm: FakeDsm, error: Exception
+) -> None:
+    fake_dsm.entry.mock(side_effect=error)
+
+    with pytest.raises(DsmNetworkError):
+        await dsm.upload(API, "upload", 2, {}, UPLOAD, max_bytes=10)
+    with pytest.raises(DsmNetworkError):
+        await dsm.download(API, "download", 2, {}, max_bytes=10)
+
+
+async def test_download_returns_bytes_and_headers(dsm: DsmClient, fake_dsm: FakeDsm) -> None:
+    fake_dsm.entry.mock(
+        return_value=httpx.Response(
+            200,
+            content=b"payload",
+            headers={"content-type": "text/plain", "content-disposition": "attachment"},
+        )
+    )
+
+    result = await dsm.download(API, "download", 2, {"files": '["id:1"]'}, max_bytes=10)
+
+    assert result.content == b"payload"
+    assert result.content_type == "text/plain"
+    assert result.content_disposition == "attachment"
+    assert fake_dsm.entry_params()["files"] == '["id:1"]'
+
+
+async def test_download_relogs_on_expired_session(dsm: DsmClient, fake_dsm: FakeDsm) -> None:
+    fake_dsm.entry.mock(side_effect=[syno_error(106), httpx.Response(200, content=b"ok")])
+
+    result = await dsm.download(API, "download", 2, {}, max_bytes=10)
+
+    assert result.content == b"ok"
+    assert len(fake_dsm.logins) == 2
+
+
+async def test_download_http_error(dsm: DsmClient, fake_dsm: FakeDsm) -> None:
+    fake_dsm.entry.mock(return_value=httpx.Response(502))
+
+    with pytest.raises(DsmNetworkError, match="HTTP 502"):
+        await dsm.download(API, "download", 2, {}, max_bytes=10)
+
+
+async def test_download_json_success_is_unexpected(dsm: DsmClient, fake_dsm: FakeDsm) -> None:
+    fake_dsm.entry.mock(return_value=OK)
+
+    with pytest.raises(DsmNetworkError, match="JSON instead of a file"):
+        await dsm.download(API, "download", 2, {}, max_bytes=10)
+
+
+async def test_download_api_error(dsm: DsmClient, fake_dsm: FakeDsm) -> None:
+    fake_dsm.entry.mock(return_value=syno_error(1003))
+
+    with pytest.raises(DsmApiError) as error:
+        await dsm.download(API, "download", 2, {}, max_bytes=10)
+    assert error.value.code == 1003
