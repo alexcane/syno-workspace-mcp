@@ -53,3 +53,11 @@ async def test_get_info_and_search(drive: DriveClient) -> None:
         assert by_id.id == listing.files[0].id
         found = await drive.search(listing.files[0].name, folder_path=SMOKE_PATH)
         assert any(f.id == by_id.id for f in found.files)
+        # The scope must hold: nothing from outside SMOKE_PATH.
+        assert all(f.path.startswith(f"{SMOKE_PATH}/") for f in found.files)
+        # An extension the file does not have filters it out.
+        other_ext = "pdf" if not listing.files[0].name.endswith(".pdf") else "txt"
+        filtered = await drive.search(
+            listing.files[0].name, folder_path=SMOKE_PATH, extension=other_ext
+        )
+        assert all(f.id != by_id.id for f in filtered.files)

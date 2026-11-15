@@ -274,14 +274,18 @@ async def test_search(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
         {"query": "labs", "folder_path": "/team-folders/labs", "extension": "osheet", "limit": 10},
     )
 
+    # Scope and extension as the Drive web UI sends them; `path`/`extension` are ignored.
     assert fake_dsm.entry_params() == {
         "api": "SYNO.SynologyDrive.Files",
         "version": "2",
         "method": "search",
-        "keyword": "labs",
-        "path": "/team-folders/labs",
+        "keyword": '"labs"',
+        "location": '"custom"',
+        "custom_location": '"/team-folders/labs"',
         "limit": "10",
-        "extension": "osheet",
+        "offset": "0",
+        "file_type": '"custom"',
+        "custom_file_type": '"osheet"',
     }
     assert result["offset"] == 0
     assert [f["name"] for f in result["files"]] == ["fichier_labs.osheet", "archives"]
@@ -293,9 +297,38 @@ async def test_search_defaults_to_mydrive(mcp: FastMCP, fake_dsm: FakeDsm) -> No
     await call(mcp, "drive_search_files", {"query": "x"})
 
     params = fake_dsm.entry_params()
-    assert params["path"] == "/mydrive"
+    assert params["custom_location"] == '"/mydrive"'
     assert params["limit"] == "50"
-    assert "extension" not in params
+    assert "file_type" not in params
+    assert "custom_file_type" not in params
+
+
+async def test_search_keyword_stays_a_string(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
+    # Each value is parsed as JSON by Drive: a bare `2024` would become a number.
+    fake_dsm.entry.mock(return_value=httpx.Response(200, json=load_fixture("drive_list_labs.json")))
+
+    await call(mcp, "drive_search_files", {"query": "2024"})
+
+    assert fake_dsm.entry_params()["keyword"] == '"2024"'
+
+
+async def test_search_strips_leading_dot_from_extension(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
+    fake_dsm.entry.mock(return_value=httpx.Response(200, json=load_fixture("drive_list_labs.json")))
+
+    await call(mcp, "drive_search_files", {"query": "x", "extension": ".pdf"})
+
+    assert fake_dsm.entry_params()["custom_file_type"] == '"pdf"'
+
+
+@pytest.mark.parametrize("extension", ["", " ", "."])
+async def test_search_rejects_empty_extension(
+    mcp: FastMCP, fake_dsm: FakeDsm, extension: str
+) -> None:
+    async with Client(mcp) as client:
+        with pytest.raises(ToolError):
+            await client.call_tool("drive_search_files", {"query": "x", "extension": extension})
+
+    assert fake_dsm.entry.call_count == 0
 
 
 @pytest.mark.parametrize("query", ["", "   "])

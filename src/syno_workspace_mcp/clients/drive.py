@@ -403,15 +403,24 @@ class DriveClient:
         limit: int = 50,
         extension: str | None = None,
     ) -> DriveFileList:
+        # Parameters as sent by the Drive web UI (4.0.4); the upstream's `path` and
+        # `extension` are silently ignored, so results came from the whole Drive.
         if not query.strip():
             raise InvalidInputError("query must not be empty")
         params: Params = {
-            "keyword": query,
-            "path": normalize_drive_path(folder_path),
+            "keyword": _j(query),
+            "location": _j("custom"),
+            "custom_location": _j(normalize_drive_path(folder_path)),
             "limit": limit,
+            "offset": 0,
         }
         if extension is not None:
-            params["extension"] = extension
+            ext = extension.strip().lstrip(".")
+            if not ext:
+                raise InvalidInputError("extension must not be empty")
+            # A plain string: a list is rejected with code 117.
+            params["file_type"] = _j("custom")
+            params["custom_file_type"] = _j(ext)
         data = await self._dsm.call(FILES_API, "search", FILES_VERSION, params)
         raw = _parse(_RawFileList, data, "search")
         return DriveFileList(total=raw.total, offset=0, files=[_to_file(f) for f in raw.items])
