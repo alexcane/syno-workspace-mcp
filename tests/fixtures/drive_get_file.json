@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "data": {
+    "file_id": "882614125167948800",
+    "name": "fichier_labs.osheet",
+    "path": "/fichier_labs.osheet",
+    "display_path": "/team-folders/labs/fichier_labs.osheet",
+    "dsm_path": "/volume1/labs/fichier_labs.osheet",
+    "type": "file",
+    "size": 2048,
+    "modified_time": 1700000000,
+    "created_time": 1699000000,
+    "owner": {"name": "alice", "uid": 1026},
+    "shared": false,
+    "capabilities": {"can_read": true, "can_write": true, "can_delete": false, "can_organize": false},
+    "labels": [{"label_id": "label-1", "name": "Important"}, "Draft"]
+  }
+}
