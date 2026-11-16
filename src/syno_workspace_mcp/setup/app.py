@@ -1,9 +1,9 @@
 """The /setup page: a 4-step wizard served when the server has no configuration.
 
-Steps: unlock with the code printed in the log, choose how Claude reaches the
-server, connect (or create) the DSM account, then save. Saving writes `DATA_DIR`
-and stops the process; Docker's restart policy starts it again with the new
-configuration, and /setup is no longer served.
+Steps: unlock with the code printed in the log, choose how the AI assistant
+reaches the server, connect (or create) the DSM account, then save. Saving
+writes `DATA_DIR` and stops the process; Docker's restart policy starts it again
+with the new configuration, and /setup is no longer served.
 
 FastMCP's auth does not cover custom routes and the allowed host names are not
 known yet, so the page protects itself: setup code, one session cookie, a CSRF
@@ -311,7 +311,7 @@ def create_setup_app(
             return plain(403, "Invalid form token: reload the page.")
         mode = form.get("mode")
         if mode not in {"local", "public"}:
-            ctx.state.error = "Choose how Claude will reach the server."
+            ctx.state.error = "Choose how your AI assistant will reach the server."
             return back_to_setup()
         if mode == "public" and form.get("public_ack") != "yes":
             ctx.state.error = "Tick every prerequisite before using a public address."

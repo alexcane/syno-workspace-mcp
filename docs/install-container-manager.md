@@ -1,7 +1,8 @@
 # Install with Container Manager (no SSH)
 
 This guide installs syno-workspace-mcp on a Synology NAS using only the DSM web
-interface, then connects Claude Desktop. Allow about 20 minutes.
+interface, then connects your AI assistant (Claude, ChatGPT, etc.). Allow about
+20 minutes.
 
 For a command-line install over SSH, see the [README](../README.md#install-on-a-synology-nas).
 
@@ -14,7 +15,7 @@ You need:
   **Synology Office** (Office is only needed for spreadsheets).
 - An HTTPS address for your NAS with a valid certificate, for example
   `nas.example.com` with a Let's Encrypt certificate
-  (*Control Panel → Security → Certificate*). Claude will connect to it.
+  (*Control Panel → Security → Certificate*). Your AI assistant will connect to it.
 - A way to generate a random password: a password manager, or the *Passwords*
   app on a Mac (see step 3).
 
@@ -115,7 +116,7 @@ stays valid until setup is done; a restart of the container prints a new one.
 ## 6. Add a reverse proxy rule
 
 The server only listens inside the NAS. DSM's reverse proxy publishes it over
-HTTPS, for the setup page now and for Claude afterwards.
+HTTPS, for the setup page now and for your AI assistant afterwards.
 
 1. Open *Control Panel → Login Portal → Advanced → Reverse Proxy* and click
    **Create**.
@@ -126,8 +127,8 @@ HTTPS, for the setup page now and for Claude afterwards.
 
    <img src="images/proxy-general.png" alt="Reverse Proxy Rules, General tab: HTTPS nas.example.com 3443 to HTTP localhost 3100" width="600">
 5. **Advanced Settings**: set **Proxy connection timeout**, **Proxy send
-   timeout** and **Proxy read timeout** to `3600` (Claude keeps a connection
-   open), and **Proxy HTTP version** to `HTTP 1.1`.
+   timeout** and **Proxy read timeout** to `3600` (MCP clients keep a
+   connection open), and **Proxy HTTP version** to `HTTP 1.1`.
 
    <img src="images/proxy-advanced.png" alt="Reverse Proxy Rules, Advanced Settings tab: timeouts 3600, HTTP 1.1" width="600">
 
@@ -145,8 +146,8 @@ port), then follow the four steps.
 
    <img src="images/setup-unlock.png" alt="Setup page, step 1: setup code field" width="480">
 2. **Exposure**: keep **Local network and VPN**. The suggested server address
-   (`https://nas.example.com:3443/mcp`) is the one Claude will use: change it
-   only if Claude reaches the NAS under another name.
+   (`https://nas.example.com:3443/mcp`) is the one your AI assistant will use:
+   change it only if it reaches the NAS under another name.
 
    <img src="images/setup-exposure.png" alt="Setup page, step 2: Local network and VPN selected, server address" width="480">
 3. **DSM account**: *Option A* starts by recalling how to create the account
@@ -156,7 +157,8 @@ port), then follow the four steps.
      port, for example `https://nas.example.com:5001`.
    - **Account name** and **Password of this account**: `mcp_service` and the
      password from step 1.
-   - **Folder Claude will work in**: a new team folder (`claude` by default),
+   - **Folder your AI assistant will work in**: a new team folder (`workspace`
+     by default),
      or the names of existing Drive team folders, for example `labs`.
    - **Administrator account**, its password, and its two-factor code if it
      uses one.
@@ -171,11 +173,12 @@ port), then follow the four steps.
 
    <img src="images/setup-dsm.png" alt="Setup page, step 3: Option A form and Option B" width="480">
 4. **Summary**: click **Save**. The page shows the **access token** once, with
-   the settings for Claude Desktop and Claude Code: copy it now.
+   the settings for Claude Desktop, Claude Code and other MCP clients: copy it
+   now.
 
    <img src="images/setup-summary.png" alt="Setup page, step 4: summary before saving" width="480">
 
-   <img src="images/setup-done.png" alt="Setup page after saving: access token, Claude Desktop and Claude Code settings, Try it prompt" width="480">
+   <img src="images/setup-done.png" alt="Setup page after saving: access token, client settings, Try it prompt" width="480">
 
 The server then restarts with its configuration; `/setup` is no longer served
 (`404`).
@@ -199,7 +202,7 @@ mode).
 If the container stops and its log starts with `Invalid configuration:`, the
 next lines name each wrong value.
 
-## 9. Connect Claude
+## 9. Connect your AI assistant
 
 Use the server address and the access token shown at the end of step 7.
 
@@ -207,20 +210,23 @@ Use the server address and the access token shown at the end of step 7.
   [Claude Desktop extension](../README.md#claude-desktop-extension).
 - **Claude Code**: copy the `claude mcp add` command shown by the setup page, or
   see [Connect a client](../README.md#connect-a-client).
+- **Other MCP clients**: add a remote MCP server (Streamable HTTP) with the
+  server address and the header `Authorization: Bearer <access token>`, see
+  [Other MCP clients](../README.md#other-mcp-clients).
 
 ## 10. Try it
 
-Start a new conversation in Claude and paste the prompt shown at the end of the
+Start a new conversation in your AI assistant and paste the prompt shown at the end of the
 setup page, for example:
 
 > Is the Synology MCP server set up correctly? List the files in my Drive team
-> folder claude.
+> folder workspace.
 
-Claude should call `drive_list_files` (Claude Desktop may ask you to allow the
-tool first) and show the content of the team folder chosen in step 7 (empty for
+It should call `drive_list_files` (it may ask you to allow the tool first) and show the content of the team folder chosen in step 7 (empty for
 a new folder). You can also ask it to list your Drive team folders. If it
-says it has no Synology tools, check that the extension is enabled, or that
-`claude mcp list` shows the server as connected. Once this works, you can close
+says it has no Synology tools, check that the server is enabled in its
+settings (in Claude Desktop, the extension; in Claude Code, `claude mcp list`
+shows it as connected). Once this works, you can close
 the setup page: the installation is done.
 
 ## Run the setup again
@@ -232,14 +238,15 @@ change the address:
    Configurations*, and remove the `#` in front of `SETUP_MODE: "true"`.
 2. Save. Container Manager offers to rebuild the project: accept (**Build**),
    then click **Start** if the project does not start by itself.
-3. Take the new setup code from the log (step 5) and run step 7 again. Claude
-   cannot use the server meanwhile.
+3. Take the new setup code from the log (step 5) and run step 7 again. Your AI
+   assistant cannot use the server meanwhile.
 4. Put the `#` back in front of `SETUP_MODE`, save and rebuild. Otherwise the
    setup page comes back at each restart.
 5. Give the new token to every client: in Claude Desktop, update the
    extension's settings; in Claude Code, run
    `claude mcp remove synology --scope user` before the new `claude mcp add`
-   command (it refuses to add a server that already exists).
+   command (it refuses to add a server that already exists); in other
+   clients, replace the token in the `Authorization` header.
 
 Saving the YAML alone does not apply a change: the containers keep running with
 the old values until the project is rebuilt.
@@ -267,8 +274,8 @@ YAML) keeps working: values in the YAML take precedence over the setup page.
   would lock out administrators too.
 - Anyone with the access token can read, change and delete files the
   `mcp_service` account can reach. If it leaks, run the setup again and update
-  the token in Claude.
+  the token in your AI assistant.
 - While in setup mode, the setup page is protected by the setup code, which
   only appears in the container log: run the setup soon after starting it.
-- Tools that overwrite, rename or delete do nothing unless Claude calls them
-  with `confirm: true`.
+- Tools that overwrite, rename or delete do nothing unless your AI assistant
+  calls them with `confirm: true`.

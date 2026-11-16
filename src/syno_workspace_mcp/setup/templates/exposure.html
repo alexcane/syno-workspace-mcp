@@ -3,13 +3,13 @@
 {% block content %}
 <form method="post" action="/setup/exposure" class="card exposure">
   <input type="hidden" name="csrf" value="{{ state.csrf }}">
-  <h2>How will Claude reach this server?</h2>
+  <h2>How will your AI assistant reach this server?</h2>
   <fieldset>
     <legend class="sr-only">Exposure</legend>
     <div class="choices">
       <label class="choice"><input type="radio" name="mode" value="local" checked>
         <span><span class="choice-title">Local network and VPN <span class="badge">Recommended</span></span>
-        <span class="choice-text">Claude connects from your network, or through your VPN.</span></span></label>
+        <span class="choice-text">Your AI assistant connects from your network, or through your VPN.</span></span></label>
       <label class="choice"><input type="radio" name="mode" value="public">
         <span><span class="choice-title">Public address on the Internet</span>
         <span class="choice-text">Only if you cannot use a VPN.</span></span></label>
@@ -17,7 +17,7 @@
   </fieldset>
 
   <div class="field">
-    <label for="mcp_url">Server address for Claude</label>
+    <label for="mcp_url">Server address for your AI assistant</label>
     <input type="url" id="mcp_url" name="mcp_url" value="{{ suggested_url }}" required>
     <p class="hint">The address of this page, ending with <code>/mcp</code> instead of
     <code>/setup</code>. It must use the reverse proxy rule and certificate you set up.</p>

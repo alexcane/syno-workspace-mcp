@@ -12,7 +12,7 @@ this page is no longer available.</p></div>
   <div class="alert alert-warning"><p><b>Copy it now:</b> it is shown only once. To get a new one later,
   run the setup again.</p></div>
   <pre>{{ token }}</pre>
-  <p class="hint">Keep this page open until Claude is connected. To check that the server
+  <p class="hint">Keep this page open until your AI assistant is connected. To check that the server
   restarted, open <a href="/health" target="_blank" rel="noopener">/health</a> in a new tab:
   it shows <code>{"status":"ok"}</code> after a few seconds.</p>
 </section>
@@ -33,15 +33,24 @@ this page is no longer available.</p></div>
 </section>
 
 <section class="card">
+  <h2>Other MCP clients</h2>
+  <p>Add a remote MCP server (Streamable HTTP transport) with:</p>
+  <ul>
+    <li>URL: <code>{{ mcp_url }}</code></li>
+    <li>Header: <code>Authorization: Bearer</code> followed by the token above.</li>
+  </ul>
+</section>
+
+<section class="card">
   <h2>Try it</h2>
-  <p>In a new conversation, ask Claude:</p>
+  <p>In a new conversation, ask your AI assistant:</p>
   {% if team_folders %}
   <pre>Is the Synology MCP server set up correctly? List the files in my Drive team folder {{ team_folders[0] }}.</pre>
-  <p class="hint">Claude should list the files of <code>/team-folders/{{ team_folders[0] }}</code>
+  <p class="hint">It should list the files of <code>/team-folders/{{ team_folders[0] }}</code>
   (empty for a new folder). Once it does, you can close this page.</p>
   {% else %}
   <pre>Is the Synology MCP server set up correctly? List my Drive team folders.</pre>
-  <p class="hint">Claude should list the team folders the account can open. Once it does,
+  <p class="hint">It should list the team folders the account can open. Once it does,
   you can close this page.</p>
   {% endif %}
 </section>

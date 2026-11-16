@@ -30,7 +30,7 @@
     <b>Disallow the user to change account password</b>, and leave every other page as is.</li>
   </ol>
   <p class="hint">This page then uses an administrator account once to create the folder
-  Claude will work in (if needed), give the new account read/write access to it, allow
+  your AI assistant will work in (if needed), give the new account read/write access to it, allow
   Synology Drive, and test the login. The administrator credentials are not stored.</p>
 
   {% include "_dsm_fields.html" %}
@@ -40,7 +40,7 @@
   </div>
 
   <fieldset>
-    <legend>Folder Claude will work in</legend>
+    <legend>Folder your AI assistant will work in</legend>
     <div class="choices">
       <div class="choice-group">
         <label class="choice"><input type="radio" name="folder_mode" value="new" checked>
@@ -49,7 +49,7 @@
           Synology Drive team folder. If it already exists, it is reused.</span></span></label>
         <div class="field choice-body new-only">
           <label for="new_folder">Folder name</label>
-          <input type="text" id="new_folder" name="new_folder" value="{{ (preparation.new_folder if preparation else none) or 'claude' }}" maxlength="32">
+          <input type="text" id="new_folder" name="new_folder" value="{{ (preparation.new_folder if preparation else none) or 'workspace' }}" maxlength="32">
         </div>
       </div>
       <label class="choice"><input type="radio" name="folder_mode" value="existing">

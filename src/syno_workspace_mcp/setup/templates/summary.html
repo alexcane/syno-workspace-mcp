@@ -6,11 +6,11 @@
   <h2>Review</h2>
   <dl class="kv">
     <dt>Exposure</dt><dd>{{ "Public address" if state.exposure == "public" else "Local network and VPN" }}</dd>
-    <dt>Address for Claude</dt><dd>{{ state.mcp_url }}</dd>
+    <dt>Address for your AI assistant</dt><dd>{{ state.mcp_url }}</dd>
     <dt>DSM</dt><dd>{{ state.dsm_url }}{% if not state.verify_tls %} (certificate not checked){% endif %}</dd>
     <dt>DSM account</dt><dd>{{ state.username }}</dd>
   </dl>
-  <p class="hint"><b>Save</b> generates the access token for Claude, shows it once, writes the
+  <p class="hint"><b>Save</b> generates the access token for your AI assistant, shows it once, writes the
   configuration and restarts the server.</p>
   <form method="post" action="/setup/finish">
     <input type="hidden" name="csrf" value="{{ state.csrf }}">

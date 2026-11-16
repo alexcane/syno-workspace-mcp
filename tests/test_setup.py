@@ -331,7 +331,7 @@ def test_existing_account_then_save(
 
     token = re.search(r"<pre>([A-Za-z0-9_-]{40,})</pre>", done.text)
     assert token
-    # Option B does not know the team folders: Claude is asked to list them.
+    # Option B does not know the team folders: the assistant is asked to list them.
     assert "List my Drive team folders." in done.text
     saved = persisted.load(tmp_path)
     assert saved["mcp_auth_token"] == token[1]
@@ -357,7 +357,7 @@ def prepare_form(csrf: str, **overrides: str) -> dict[str, str]:
         "csrf": csrf,
         "password": TEST_PASSWORD,
         "folder_mode": "new",
-        "new_folder": "claude",
+        "new_folder": "workspace",
         "team_folders": "",
         "admin_username": "admin",
         "admin_password": ADMIN_PASSWORD,
@@ -386,7 +386,7 @@ def test_prepare_folder_and_account(page: TestClient, fake_dsm: FakeDsm, tmp_pat
     calls = dict(dsm.calls)
     assert json.loads(calls["SYNO.Core.Share.create"]["shareinfo"])["vol_path"] == "/volume1"
     permissions = json.loads(calls["SYNO.Core.Share.Permission.set_by_user_group"]["permissions"])
-    assert [p["name"] for p in permissions] == ["claude", "labs"]
+    assert [p["name"] for p in permissions] == ["workspace", "labs"]
     assert all(p["is_writable"] and not p["is_deny"] for p in permissions)
     rule = json.loads(calls["SYNO.Core.AppPriv.Rule.set"]["rules"])[0]
     assert rule["app_id"] == "SYNO.SDS.Drive.Application"
@@ -399,7 +399,7 @@ def test_prepare_folder_and_account(page: TestClient, fake_dsm: FakeDsm, tmp_pat
     assert len(fake_dsm.logouts) == 2
 
     done = page.post("/setup/finish", data={"csrf": csrf})
-    assert "List the files in my Drive team folder claude." in done.text
+    assert "List the files in my Drive team folder workspace." in done.text
     saved = persisted.load(tmp_path)
     assert saved["syno_username"] == "mcp_service"
     assert saved["syno_password"] == TEST_PASSWORD

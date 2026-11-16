@@ -90,6 +90,13 @@ stdio bridge (requires [uv](https://docs.astral.sh/uv/)). In
 
 If DSM uses a certificate from a private CA, add `"--verify", "/path/to/ca.pem"`.
 
+### Other MCP clients
+
+Any client that supports remote MCP servers over Streamable HTTP with a custom
+header can connect: URL `https://<host>:<port>/mcp`, header
+`Authorization: Bearer <MCP_AUTH_TOKEN>`. Clients that only accept OAuth for
+remote servers cannot use the static token.
+
 ## Spreadsheet tools
 
 Spreadsheet tools go through the `synology/spreadsheet-api` container (started by
@@ -145,8 +152,8 @@ npm run pack   # dist/syno-workspace-mcp-<version>.mcpb, production deps only
 
 The server and the extension send nothing to third parties. The extension only
 talks to the server URL you enter; the server only talks to your own DSM and to
-the Spreadsheet container on the NAS. Files and spreadsheet contents go to Claude
-only when a tool returns them.
+the Spreadsheet container on the NAS. Files and spreadsheet contents go to your AI
+assistant only when a tool returns them.
 
 ## Releases
 
