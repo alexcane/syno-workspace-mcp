@@ -1,37 +1,9 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>syno-workspace-mcp setup</title>
-<style>
-  :root { color-scheme: light dark; --accent: #2563eb; --muted: #6b7280; --border: #d1d5db; --error: #b91c1c; --ok: #15803d; }
-  body { font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
-  h1 { font-size: 1.4rem; margin-bottom: .25rem; }
-  h2 { font-size: 1.1rem; margin-top: 2rem; }
-  .steps { color: var(--muted); font-size: .9rem; margin-bottom: 1.5rem; }
-  .steps b { color: var(--accent); }
-  form { margin: 1rem 0; }
-  fieldset { border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
-  label { display: block; margin: .75rem 0 .25rem; font-weight: 600; }
-  label.inline { display: flex; gap: .5rem; align-items: flex-start; font-weight: normal; }
-  input[type=text], input[type=password], input[type=url], textarea { width: 100%; box-sizing: border-box; padding: .5rem; font: inherit; border: 1px solid var(--border); border-radius: .375rem; }
-  button { margin-top: 1rem; padding: .55rem 1.1rem; font: inherit; border: 0; border-radius: .375rem; background: var(--accent); color: white; cursor: pointer; }
-  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
-  .hint { color: var(--muted); font-size: .9rem; margin: .25rem 0; }
-  .error { border-left: 4px solid var(--error); padding: .5rem .75rem; margin: 1rem 0; color: var(--error); }
-  .warning { border-left: 4px solid #d97706; padding: .5rem .75rem; margin: 1rem 0; }
-  .ok { color: var(--ok); }
-  pre { white-space: pre-wrap; word-break: break-all; padding: .75rem; border: 1px solid var(--border); border-radius: .375rem; font-size: .85rem; }
-  dl { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; }
-  dt { font-weight: 600; }
-  dd { margin: 0; word-break: break-all; }
-</style>
-</head>
-<body>
-<h1>syno-workspace-mcp setup</h1>
-{% block steps %}{% endblock %}
-{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
-{% block content %}{% endblock %}
-</body>
-</html>
+{% extends "layout.html" %}
+{% from "_macros.html" import steps %}
+{% block title %}Setup{% endblock %}
+{% block section %}Setup{% endblock %}
+{% block heading %}
+<h1>Set up the server</h1>
+<p class="lead"><b>Connect Claude to your NAS</b> in four steps. Nothing is saved until the last one.</p>
+{% endblock %}
+{% block steps %}{% if step is defined %}{{ steps(["Access", "Exposure", "DSM account", "Summary"], step) }}{% endif %}{% endblock %}

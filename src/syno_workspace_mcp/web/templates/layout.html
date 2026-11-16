@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"{% if theme in ("light", "dark") %} data-theme="{{ theme }}"{% endif %}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{% block title %}{% endblock %} · syno-workspace-mcp</title>
+<style>
+{% include "_theme.css" %}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>syno-workspace-mcp</span>
+    <span class="topbar-section">{% block section %}{% endblock %}</span>
+  </div>
+</header>
+<main class="page">
+  <div class="page-head">{% block heading %}{% endblock %}</div>
+  {% block steps %}{% endblock %}
+  {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="footer">syno-workspace-mcp {{ version }} · Synology Drive and Spreadsheet for Claude</footer>
+</body>
+</html>

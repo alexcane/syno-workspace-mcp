@@ -1,26 +1,33 @@
 {% extends "base.html" %}
+{% set step = 0 %}
 {% block content %}
 {% if restarting %}
-<p class="ok">Setup is complete. The server is restarting with its new configuration:
-this page is no longer available.</p>
+<div class="alert alert-success"><p class="ok">Setup is complete. The server is restarting with its new configuration:
+this page is no longer available.</p></div>
 {% else %}
-<p class="ok">Configuration saved. The server restarts in a few seconds.</p>
+<div class="alert alert-success"><p class="ok">Configuration saved. The server restarts in a few seconds.</p></div>
 
-<h2>Access token</h2>
-<p class="warning"><b>Copy it now:</b> it is shown only once. To get a new one later,
-run the setup again.</p>
-<pre>{{ token }}</pre>
+<section class="card">
+  <h2>Access token</h2>
+  <div class="alert alert-warning"><p><b>Copy it now:</b> it is shown only once. To get a new one later,
+  run the setup again.</p></div>
+  <pre>{{ token }}</pre>
+</section>
 
-<h2>Claude Desktop</h2>
-<ol>
-  <li>Download <code>syno-workspace-mcp-&lt;version&gt;.mcpb</code> from the
-  <a href="https://github.com/alexcane/syno-workspace-mcp/releases/latest">latest release</a> and double-click it.</li>
-  <li>Server URL: <code>{{ mcp_url }}</code></li>
-  <li>Access token: the token above.</li>
-</ol>
+<section class="card">
+  <h2>Claude Desktop</h2>
+  <ol>
+    <li>Download <code>syno-workspace-mcp-&lt;version&gt;.mcpb</code> from the
+    <a href="https://github.com/alexcane/syno-workspace-mcp/releases/latest">latest release</a> and double-click it.</li>
+    <li>Server URL: <code>{{ mcp_url }}</code></li>
+    <li>Access token: the token above.</li>
+  </ol>
+</section>
 
-<h2>Claude Code</h2>
-<pre>claude mcp add --scope user --transport http synology {{ mcp_url }} --header "Authorization: Bearer {{ token }}"</pre>
+<section class="card">
+  <h2>Claude Code</h2>
+  <pre>claude mcp add --scope user --transport http synology {{ mcp_url }} --header "Authorization: Bearer {{ token }}"</pre>
+</section>
 
 <p class="hint">If the container was started with <code>SETUP_MODE=true</code>, remove that
 variable, otherwise this page comes back after the restart.</p>

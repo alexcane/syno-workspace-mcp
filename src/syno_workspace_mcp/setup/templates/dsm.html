@@ -1,10 +1,8 @@
 {% extends "base.html" %}
-{% block steps %}<p class="steps">1. Access · 2. Exposure · <b>3. DSM account</b> · 4. Summary</p>{% endblock %}
+{% set step = 3 %}
 {% block content %}
-<p>The server signs in to DSM with its own account, limited to Synology Drive.</p>
-
 {% if preparation %}
-<div class="warning">
+<div class="alert alert-warning">
   <p><b>The previous attempt stopped half-way.</b> Done for <code>{{ preparation.username }}</code>:</p>
   <ul>
     {% if preparation.new_folder %}
@@ -19,57 +17,86 @@
 </div>
 {% endif %}
 
-<h2>Option A: prepare a new account (recommended)</h2>
-<p>DSM only lets its own web interface create accounts, so start there:</p>
-<ol>
-  <li>In DSM, open <b>Control Panel → User &amp; Group → User → Create</b>.</li>
-  <li>Name it <code>{{ default_account }}</code>, give it a strong password, tick
-  <b>Disallow the user to change account password</b>, and leave every other page as is.</li>
-</ol>
-<p class="hint">This page then uses an administrator account once to create the folder
-Claude will work in (if needed), give the new account read/write access to it, allow
-Synology Drive, and test the login. The administrator credentials are not stored.</p>
-<form method="post" action="/setup/dsm/prepare" autocomplete="off">
+<p class="hint intro">The server signs in to DSM with its own account, limited to Synology Drive.</p>
+
+<form method="post" action="/setup/dsm/prepare" autocomplete="off" class="card dsm-prepare">
   <input type="hidden" name="csrf" value="{{ state.csrf }}">
+  <h2>Option A: prepare a new account <span class="badge">Recommended</span></h2>
+  <p class="hint">DSM only lets its own web interface create accounts, so start there:</p>
+  <ol>
+    <li>In DSM, open <b>Control Panel → User &amp; Group → User → Create</b>.</li>
+    <li>Name it <code>{{ default_account }}</code>, give it a strong password, tick
+    <b>Disallow the user to change account password</b>, and leave every other page as is.</li>
+  </ol>
+  <p class="hint">This page then uses an administrator account once to create the folder
+  Claude will work in (if needed), give the new account read/write access to it, allow
+  Synology Drive, and test the login. The administrator credentials are not stored.</p>
+
   {% include "_dsm_fields.html" %}
-  <label for="new_password">Password of this account</label>
-  <input type="password" id="new_password" name="password" autocomplete="off" required>
+  <div class="field">
+    <label for="new_password">Password of this account</label>
+    <input type="password" id="new_password" name="password" autocomplete="off" required>
+  </div>
+
   <fieldset>
     <legend>Folder Claude will work in</legend>
-    <label class="inline"><input type="radio" name="folder_mode" value="new" checked>
-      <span><b>Create a new team folder</b></span></label>
-    <label for="new_folder">Folder name</label>
-    <input type="text" id="new_folder" name="new_folder" value="{{ (preparation.new_folder if preparation else none) or 'claude' }}" maxlength="32">
-    <p class="hint">Created as a shared folder on the first volume and enabled as a
-    Synology Drive team folder. If it already exists, it is reused.</p>
-    <label class="inline"><input type="radio" name="folder_mode" value="existing">
-      <span><b>Only use existing team folders</b></span></label>
-    <label for="team_folders">Other existing team folders (optional)</label>
-    <input type="text" id="team_folders" name="team_folders" placeholder="labs, projects">
-    <p class="hint">Comma-separated names, as shown in the Synology Drive Admin Console.</p>
+    <div class="choices">
+      <div class="choice-group">
+        <label class="choice"><input type="radio" name="folder_mode" value="new" checked>
+          <span><span class="choice-title">Create a new team folder</span>
+          <span class="choice-text">Created as a shared folder on the first volume and enabled as a
+          Synology Drive team folder. If it already exists, it is reused.</span></span></label>
+        <div class="field choice-body new-only">
+          <label for="new_folder">Folder name</label>
+          <input type="text" id="new_folder" name="new_folder" value="{{ (preparation.new_folder if preparation else none) or 'claude' }}" maxlength="32">
+        </div>
+      </div>
+      <label class="choice"><input type="radio" name="folder_mode" value="existing">
+        <span><span class="choice-title">Only use existing team folders</span>
+        <span class="choice-text">Name them below.</span></span></label>
+    </div>
+    <div class="field">
+      <label for="team_folders">Other existing team folders (optional)</label>
+      <input type="text" id="team_folders" name="team_folders" placeholder="labs, projects">
+      <p class="hint">Comma-separated names, as shown in the Synology Drive Admin Console.</p>
+    </div>
   </fieldset>
-  <label for="admin_username">Administrator account</label>
-  <input type="text" id="admin_username" name="admin_username" autocomplete="off" required>
-  <label for="admin_password">Administrator password</label>
-  <input type="password" id="admin_password" name="admin_password" autocomplete="off" required>
-  <label for="otp_code">Two-factor code (if the administrator uses 2FA)</label>
-  <input type="text" id="otp_code" name="otp_code" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
-  <button type="submit">Prepare the account</button>
+
+  <fieldset>
+    <legend>Administrator</legend>
+    <div class="field">
+      <label for="admin_username">Administrator account</label>
+      <input type="text" id="admin_username" name="admin_username" autocomplete="off" required>
+    </div>
+    <div class="field">
+      <label for="admin_password">Administrator password</label>
+      <input type="password" id="admin_password" name="admin_password" autocomplete="off" required>
+    </div>
+    <div class="field">
+      <label for="otp_code">Two-factor code (if the administrator uses 2FA)</label>
+      <input type="text" id="otp_code" name="otp_code" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
+    </div>
+  </fieldset>
+  <div class="actions"><button type="submit">Prepare the account</button></div>
 </form>
 
-<h2>Option B: use an account that is already set up</h2>
-<p class="hint">The account must be allowed to use Synology Drive, with read/write
-access to its team folders, and must not use two-factor authentication.</p>
-<form method="post" action="/setup/dsm/check" autocomplete="off">
+<div class="divider">or</div>
+
+<form method="post" action="/setup/dsm/check" autocomplete="off" class="card">
   <input type="hidden" name="csrf" value="{{ state.csrf }}">
+  <h2>Option B: use an account that is already set up</h2>
+  <p class="hint">The account must be allowed to use Synology Drive, with read/write
+  access to its team folders, and must not use two-factor authentication.</p>
   {% include "_dsm_fields.html" %}
-  <label for="password">Account password</label>
-  <input type="password" id="password" name="password" autocomplete="off" required>
-  <button type="submit">Test and continue</button>
+  <div class="field">
+    <label for="password">Account password</label>
+    <input type="password" id="password" name="password" autocomplete="off" required>
+  </div>
+  <div class="actions"><button type="submit" class="secondary">Test and continue</button></div>
 </form>
 
-<form method="post" action="/setup/restart">
+<form method="post" action="/setup/restart" class="back">
   <input type="hidden" name="csrf" value="{{ state.csrf }}">
-  <button type="submit" class="secondary">Back to step 2</button>
+  <button type="submit" class="ghost">← Back to step 2</button>
 </form>
 {% endblock %}

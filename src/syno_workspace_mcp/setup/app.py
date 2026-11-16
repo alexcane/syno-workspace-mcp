@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import Environment
 from pydantic import SecretStr
 from starlette.applications import Starlette
 from starlette.background import BackgroundTask
@@ -43,6 +43,7 @@ from syno_workspace_mcp.setup.accounts import (
     parse_folder_name,
     prepare_service_account,
 )
+from syno_workspace_mcp.web import SECURITY_HEADERS, create_environment
 
 logger = logging.getLogger(__name__)
 
@@ -57,19 +58,6 @@ DEFAULT_ACCOUNT = "mcp_service"
 # DSM rejects these characters in account names; the first one cannot be a space.
 _FORBIDDEN = r"!\"#$%&'()*+,/:;<=>?@\[\]\\^`{}|~"
 _USERNAME = re.compile(rf"[^{_FORBIDDEN}\s][^{_FORBIDDEN}]*")
-
-_SECURITY_HEADERS = {
-    "Cache-Control": "no-store",
-    "Content-Security-Policy": (
-        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
-        "frame-ancestors 'none'; base-uri 'none'"
-    ),
-    # Not `no-referrer`: with it, browsers send `Origin: null` on form posts, which
-    # the same-origin check must refuse.
-    "Referrer-Policy": "same-origin",
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-}
 
 
 def generate_code() -> str:
@@ -209,10 +197,7 @@ class SetupContext:
     on_finished: Callable[[], Awaitable[None] | None]
     limiter: RateLimiter = field(default_factory=RateLimiter)
     templates: Environment = field(
-        default_factory=lambda: Environment(
-            loader=PackageLoader("syno_workspace_mcp.setup", "templates"),
-            autoescape=select_autoescape(default=True),
-        )
+        default_factory=lambda: create_environment("syno_workspace_mcp.setup")
     )
 
 
@@ -234,15 +219,13 @@ def create_setup_app(
         state = ctx.state
         error, state.error = state.error, None
         html = ctx.templates.get_template(name).render(state=state, error=error, **values)
-        return HTMLResponse(html, status_code=status, headers=_SECURITY_HEADERS)
+        return HTMLResponse(html, status_code=status, headers=SECURITY_HEADERS)
 
     def plain(status: int, text: str) -> Response:
-        return Response(
-            text, status_code=status, media_type="text/plain", headers=_SECURITY_HEADERS
-        )
+        return Response(text, status_code=status, media_type="text/plain", headers=SECURITY_HEADERS)
 
     def back_to_setup() -> RedirectResponse:
-        return RedirectResponse(SETUP_PATH, status_code=303, headers=_SECURITY_HEADERS)
+        return RedirectResponse(SETUP_PATH, status_code=303, headers=SECURITY_HEADERS)
 
     def unlocked(request: Request) -> bool:
         session = request.cookies.get(SESSION_COOKIE)

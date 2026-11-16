@@ -1,24 +1,29 @@
 {% extends "base.html" %}
-{% block steps %}<p class="steps">1. Access · <b>2. Exposure</b> · 3. DSM account · 4. Summary</p>{% endblock %}
+{% set step = 2 %}
 {% block content %}
-<p>How will Claude reach this server?</p>
-<form method="post" action="/setup/exposure">
+<form method="post" action="/setup/exposure" class="card exposure">
   <input type="hidden" name="csrf" value="{{ state.csrf }}">
+  <h2>How will Claude reach this server?</h2>
   <fieldset>
-    <label class="inline"><input type="radio" name="mode" value="local" checked>
-      <span><b>Local network and VPN</b> (recommended)<br>
-      <span class="hint">Claude connects from your network, or through your VPN.</span></span></label>
-    <label class="inline"><input type="radio" name="mode" value="public">
-      <span><b>Public address on the Internet</b><br>
-      <span class="hint">Only if you cannot use a VPN.</span></span></label>
+    <legend class="sr-only">Exposure</legend>
+    <div class="choices">
+      <label class="choice"><input type="radio" name="mode" value="local" checked>
+        <span><span class="choice-title">Local network and VPN <span class="badge">Recommended</span></span>
+        <span class="choice-text">Claude connects from your network, or through your VPN.</span></span></label>
+      <label class="choice"><input type="radio" name="mode" value="public">
+        <span><span class="choice-title">Public address on the Internet</span>
+        <span class="choice-text">Only if you cannot use a VPN.</span></span></label>
+    </div>
   </fieldset>
 
-  <label for="mcp_url">Server address for Claude</label>
-  <input type="url" id="mcp_url" name="mcp_url" value="{{ suggested_url }}" required>
-  <p class="hint">The address of this page, ending with <code>/mcp</code> instead of
-  <code>/setup</code>. It must use the reverse proxy rule and certificate you set up.</p>
+  <div class="field">
+    <label for="mcp_url">Server address for Claude</label>
+    <input type="url" id="mcp_url" name="mcp_url" value="{{ suggested_url }}" required>
+    <p class="hint">The address of this page, ending with <code>/mcp</code> instead of
+    <code>/setup</code>. It must use the reverse proxy rule and certificate you set up.</p>
+  </div>
 
-  <div class="warning">
+  <div class="alert alert-warning public-only">
     <p><b>Public address only:</b> the access token becomes the only protection
     against the whole Internet. Before choosing it, make sure that:</p>
     <ul>
@@ -26,10 +31,10 @@
       <li>the certificate covers this host name;</li>
       <li>your router forwards the port to the NAS.</li>
     </ul>
-    <label class="inline"><input type="checkbox" name="public_ack" value="yes">
+    <label class="check"><input type="checkbox" name="public_ack" value="yes">
       <span>I checked these three points (required for a public address).</span></label>
   </div>
 
-  <button type="submit">Continue</button>
+  <div class="actions"><button type="submit">Continue</button></div>
 </form>
 {% endblock %}

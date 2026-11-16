@@ -1,11 +1,17 @@
 {% extends "base.html" %}
-{% block steps %}<p class="steps"><b>1. Access</b> · 2. Exposure · 3. DSM account · 4. Summary</p>{% endblock %}
+{% set step = 1 %}
 {% block content %}
-<p>Enter the setup code shown in the server log: in Container Manager, open the
-<code>syno-workspace-mcp</code> container, then its <b>Log</b> tab.</p>
-<form method="post" action="/setup/unlock">
-  <label for="code">Setup code</label>
-  <input type="text" id="code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" required autofocus>
-  <button type="submit">Continue</button>
-</form>
+<section class="card">
+  <h2>Enter the setup code</h2>
+  <p class="hint">It is printed in the server log: in Container Manager, open the
+  <code>syno-workspace-mcp</code> container, then its <b>Log</b> tab, and look for the
+  line <code>Setup code: …</code>.</p>
+  <form method="post" action="/setup/unlock">
+    <div class="field">
+      <label for="code">Setup code</label>
+      <input type="text" id="code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD2345" required autofocus>
+    </div>
+    <div class="actions"><button type="submit">Continue</button></div>
+  </form>
+</section>
 {% endblock %}

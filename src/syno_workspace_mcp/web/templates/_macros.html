@@ -1,0 +1,12 @@
+{# Progress of a multi-step form. `current` starts at 1; 0 marks every step as done. #}
+{% macro steps(labels, current) -%}
+<ol class="steps">
+  {%- for label in labels %}
+  {%- set state = "current" if loop.index == current else ("done" if current == 0 or loop.index < current else "todo") %}
+  <li class="step step-{{ state }}"{% if state == "current" %} aria-current="step"{% endif %}>
+    <span class="step-num">{% if state == "done" %}✓{% else %}{{ loop.index }}{% endif %}</span>
+    <span class="step-label">{{ label }}</span>
+  </li>
+  {%- endfor %}
+</ol>
+{%- endmacro %}
