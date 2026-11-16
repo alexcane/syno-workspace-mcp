@@ -29,6 +29,8 @@ TASKS_API = "SYNO.SynologyDrive.Tasks"
 TASKS_VERSION = 1
 ADV_SHARING_API = "SYNO.SynologyDrive.AdvanceSharing"
 ADV_SHARING_VERSION = 1
+TEAM_FOLDERS_API = "SYNO.SynologyDrive.TeamFolders"
+TEAM_FOLDERS_VERSION = 1
 
 FILE_NOT_FOUND = 1003
 SHARING_LINK_NOT_CREATED = 1036
@@ -36,7 +38,8 @@ SHARING_LINK_NOT_CREATED = 1036
 # Upstream recommends staying under 50 MB: the payload travels base64-encoded in MCP.
 MAX_TRANSFER_BYTES = 50 * 1024 * 1024
 
-DRIVE_ROOTS = ("/mydrive", "/team-folders")
+TEAM_FOLDERS_ROOT = "/team-folders"
+DRIVE_ROOTS = ("/mydrive", TEAM_FOLDERS_ROOT)
 _FILE_ID = re.compile(r"(?:id:)?(\d+)")
 
 SortBy = Literal["name", "size", "user", "modified", "created"]
@@ -183,6 +186,20 @@ class _RawFileList(BaseModel):
 
     total: int = 0
     items: list[_RawFile] = Field(default_factory=list)
+
+
+class _RawTeamFolder(BaseModel):
+    model_config = ConfigDict(extra="allow", coerce_numbers_to_str=True)
+
+    file_id: str
+    name: str
+    capabilities: dict[str, bool] = Field(default_factory=dict)
+
+
+class _RawTeamFolderList(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    items: list[_RawTeamFolder] = Field(default_factory=list)
 
 
 _EXTENSION_GLOB = re.compile(r"\*\.([A-Za-z0-9]+)")
@@ -605,8 +622,11 @@ class DriveClient:
         file_type: FileType,
         pattern: str | None,
     ) -> _RawFileList:
+        path = normalize_drive_path(folder_path)
+        if path == TEAM_FOLDERS_ROOT:
+            return await self._list_team_folders(limit, offset, sort_direction, file_type, pattern)
         params: Params = {
-            "path": normalize_drive_path(folder_path),
+            "path": path,
             "offset": offset,
             "limit": limit,
             "sort_by": sort_by,
@@ -622,6 +642,41 @@ class DriveClient:
         glob = local_glob.lower()
         items = [item for item in raw.items if fnmatch.fnmatchcase(item.name.lower(), glob)]
         return _RawFileList(total=len(items), items=items)
+
+    async def _list_team_folders(
+        self,
+        limit: int,
+        offset: int,
+        sort_direction: SortDirection,
+        file_type: FileType,
+        pattern: str | None,
+    ) -> _RawFileList:
+        """The team folders this account can open.
+
+        `Files.list` rejects `/team-folders` itself (code 1000). `TeamFolders.list`
+        answers non-admin accounts and only returns the folders they have access to
+        (verified on the NAS). It has no size or dates: always sorted by name, and
+        filtered and paginated here.
+        """
+        if file_type == "file":
+            return _RawFileList(total=0)
+        data = await self._dsm.call(TEAM_FOLDERS_API, "list", TEAM_FOLDERS_VERSION)
+        folders = _parse(_RawTeamFolderList, data, "team folders").items
+        if pattern is not None:
+            glob = pattern.strip().lower()
+            folders = [f for f in folders if fnmatch.fnmatchcase(f.name.lower(), glob)]
+        folders.sort(key=lambda f: f.name.lower(), reverse=sort_direction == "DESC")
+        items = [
+            _RawFile(
+                file_id=f.file_id,
+                name=f.name,
+                path=f"{TEAM_FOLDERS_ROOT}/{f.name}",
+                type="dir",
+                capabilities=f.capabilities,
+            )
+            for f in folders
+        ]
+        return _RawFileList(total=len(items), items=items[offset : offset + limit])
 
     async def _get_raw(self, ref: str) -> _RawFile:
         data = await self._dsm.call(FILES_API, "get", FILES_VERSION, {"path": ref})

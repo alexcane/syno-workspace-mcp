@@ -165,6 +165,95 @@ async def test_other_globs_filter_the_fetched_page(mcp: FastMCP, fake_dsm: FakeD
     assert result["total"] == 2
 
 
+def team_folders(*names: str) -> httpx.Response:
+    # Shape returned by TeamFolders.list on the NAS (Drive 4.0.4), for a non-admin account.
+    items = [
+        {
+            "file_id": str(900 + i),
+            "name": n,
+            "team_id": str(i),
+            "capabilities": {"can_read": True, "can_write": True},
+            "disable_download": False,
+            "enable_versioning": True,
+            "keep_versions": 8,
+        }
+        for i, n in enumerate(names)
+    ]
+    return httpx.Response(200, json={"success": True, "data": {"items": items}})
+
+
+@pytest.mark.parametrize("path", ["/team-folders", "/team-folders/"])
+async def test_list_team_folders_root(mcp: FastMCP, fake_dsm: FakeDsm, path: str) -> None:
+    fake_dsm.entry.mock(return_value=team_folders("workspace", "Archives"))
+
+    result = await call(mcp, "drive_list_files", {"folder_path": path})
+
+    # Files.list answers 1000 on the root itself: TeamFolders.list is used instead.
+    assert fake_dsm.entry_params() == {
+        "api": "SYNO.SynologyDrive.TeamFolders",
+        "version": "1",
+        "method": "list",
+    }
+    assert result["total"] == 2
+    assert result["files"] == [
+        {
+            "id": "901",
+            "name": "Archives",
+            "path": "/team-folders/Archives",
+            "type": "dir",
+            "size": 0,
+            "modified": "",
+            "created": "",
+            "owner": "",
+            "extension": "",
+            "is_shared": False,
+        },
+        {
+            "id": "900",
+            "name": "workspace",
+            "path": "/team-folders/workspace",
+            "type": "dir",
+            "size": 0,
+            "modified": "",
+            "created": "",
+            "owner": "",
+            "extension": "",
+            "is_shared": False,
+        },
+    ]
+
+
+async def test_list_team_folders_filters_sorts_and_paginates(
+    mcp: FastMCP, fake_dsm: FakeDsm
+) -> None:
+    fake_dsm.entry.mock(return_value=team_folders("labs", "projects", "Lab-2", "workspace"))
+
+    result = await call(
+        mcp,
+        "drive_list_files",
+        {
+            "folder_path": "/team-folders",
+            "pattern": "lab*",
+            "sort_direction": "DESC",
+            "offset": 1,
+            "limit": 5,
+        },
+    )
+
+    assert result["total"] == 2
+    assert result["offset"] == 1
+    assert [f["name"] for f in result["files"]] == ["Lab-2"]
+
+
+async def test_list_team_folders_has_no_files(mcp: FastMCP, fake_dsm: FakeDsm) -> None:
+    result = await call(
+        mcp, "drive_list_files", {"folder_path": "/team-folders", "file_type": "file"}
+    )
+
+    assert result == {"total": 0, "offset": 0, "files": []}
+    assert fake_dsm.entry.call_count == 0
+
+
 @pytest.mark.parametrize(
     ("path", "message"),
     [

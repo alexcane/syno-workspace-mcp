@@ -106,7 +106,8 @@ def register_drive_tools(mcp: FastMCP) -> None:
     ) -> DriveFileList:
         """List files and folders in a Synology Drive path.
 
-        Supports pagination, sorting, and glob filtering. A '*.ext' pattern is applied
+        '/team-folders' lists the team folders this account can open, always sorted
+        by name. Supports pagination, sorting, and glob filtering. A '*.ext' pattern is applied
         by Drive (files only); any other pattern only filters the page that was fetched,
         and `total` then counts the matches in that page.
         """
