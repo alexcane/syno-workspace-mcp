@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en"{% if theme in ("light", "dark") %} data-theme="{{ theme }}"{% endif %}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>syno-workspace-mcp · Synology Drive for your AI assistant</title>
+<meta name="description" content="Like the Google Drive or OneDrive connectors, but for the files and spreadsheets on your own Synology NAS. Self-hosted, open source MCP server.">
+<meta property="og:title" content="syno-workspace-mcp">
+<meta property="og:description" content="Connect your AI assistant to Synology Drive and Spreadsheet on your own NAS.">
+<meta property="og:type" content="website">
+<style>
+{% include "_theme.css" %}
+
+/* Landing page: wider frame and marketing blocks on top of the shared theme. */
+.topbar-inner, .wrap { max-width: 64rem; }
+.wrap { margin: 0 auto; padding: 0 1rem; width: 100%; }
+.topbar-links { display: flex; gap: 1.25rem; font-size: 0.875rem; }
+.topbar-links a { color: var(--muted-foreground); text-decoration: none; }
+.topbar-links a:hover { color: var(--foreground); }
+
+.hero { padding: 4rem 1rem 3rem; display: grid; gap: 2.5rem; grid-template-columns: 1.1fr 1fr; align-items: center; }
+.hero h1 { font-size: clamp(2rem, 4.5vw, 2.9rem); font-weight: 700; letter-spacing: -0.03em; }
+.hero h1 em { font-style: normal; color: var(--primary); }
+.hero .lead { font-size: 1.15rem; margin-top: 1rem; }
+.eyebrow {
+  display: inline-block; margin-bottom: 1rem; padding: 0.2rem 0.7rem;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--card);
+  color: var(--muted-foreground); font-size: 0.8rem; font-weight: 550;
+}
+.hero .actions { margin-top: 1.75rem; }
+.btn-lg { padding: 0.7rem 1.35rem; font-size: 0.95rem; }
+
+.chat {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 12px 32px oklch(0.147 0.004 49.3 / 8%); padding: 1.1rem; font-size: 0.9rem;
+}
+.chat-msg { padding: 0.7rem 0.9rem; border-radius: calc(var(--radius) - 2px); margin: 0; }
+.chat-user { background: var(--muted); margin-left: 2.5rem; }
+.chat-tool {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.8rem 0;
+  color: var(--muted-foreground); font-size: 0.78rem;
+}
+.chat-tool code { background: transparent; border: 1px solid var(--border); padding: 0.15em 0.5em; }
+.chat-assistant { padding-left: 0; padding-right: 0; }
+.chat-assistant ul { margin: 0.4rem 0 0; }
+
+section.block { padding: 3.5rem 0; border-top: 1px solid var(--border); }
+.block h2 { font-size: clamp(1.4rem, 3vw, 1.75rem); font-weight: 650; }
+.block h2 + .lead { max-width: 42rem; }
+
+.compare { width: 100%; border-collapse: collapse; margin-top: 1.75rem; font-size: 0.92rem; }
+.compare th, .compare td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.compare thead th { font-size: 0.82rem; color: var(--muted-foreground); font-weight: 550; }
+.compare thead th.us { color: var(--primary); }
+.compare tbody th { font-weight: 550; width: 28%; }
+.compare td.us { background: color-mix(in oklch, var(--primary) 5%, transparent); }
+
+.grid { display: grid; gap: 1rem; margin-top: 1.75rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+.grid .card { margin: 0; }
+.card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.35rem; }
+.card p { color: var(--muted-foreground); font-size: 0.9rem; }
+.icon {
+  display: inline-grid; place-items: center; width: 2.1rem; height: 2.1rem; margin-bottom: 0.8rem;
+  border-radius: 0.5rem; font-size: 1.05rem;
+  background: color-mix(in oklch, var(--primary) 12%, transparent); color: var(--primary);
+}
+
+.steps-list { list-style: none; padding: 0; margin: 1.75rem 0 0; display: grid; gap: 1rem; counter-reset: step; }
+.steps-list li { margin: 0; display: grid; grid-template-columns: 2.25rem 1fr; gap: 0.9rem; }
+.steps-list li::before {
+  counter-increment: step; content: counter(step);
+  display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 999px;
+  background: var(--primary); color: var(--primary-foreground); font-weight: 650;
+}
+.steps-list h3 { font-size: 1rem; font-weight: 600; margin-top: 0.4rem; }
+.steps-list p { color: var(--muted-foreground); font-size: 0.92rem; }
+.split { display: grid; gap: 2.5rem; grid-template-columns: 1fr 1fr; align-items: start; }
+.shot {
+  width: 100%; height: auto; display: block; margin-top: 1.75rem;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 12px 32px oklch(0.147 0.004 49.3 / 8%);
+}
+
+.checklist li { color: var(--muted-foreground); }
+.checklist li b { color: var(--foreground); font-weight: 550; }
+.cta { text-align: center; }
+.cta .lead { margin-left: auto; margin-right: auto; }
+.cta .actions { justify-content: center; }
+.footer p { margin: 0.25rem 0; }
+
+@media (max-width: 820px) {
+  .hero, .split { grid-template-columns: 1fr; }
+  .hero { padding-top: 2.5rem; gap: 2rem; }
+  .compare tbody th { width: auto; }
+}
+@media (max-width: 560px) {
+  .topbar-links a.optional { display: none; }
+  .compare th, .compare td { padding: 0.6rem 0.5rem; }
+  .chat-user { margin-left: 1rem; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>syno-workspace-mcp</span>
+    <nav class="topbar-links" aria-label="Main">
+      <a class="optional" href="#features">Features</a>
+      <a class="optional" href="#get-started">Get started</a>
+      <a href="{{ repository }}">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <span class="eyebrow">Open source · MIT · v{{ version }}</span>
+      <h1>Your Synology Drive, <em>connected to your AI assistant</em></h1>
+      <p class="lead">Like the <b>Google Drive</b> or <b>OneDrive</b> connectors, but for the
+        files and spreadsheets on <b>your own NAS</b>. Ask your assistant to find a
+        document, summarize a spreadsheet or tidy up a folder: nothing goes through a
+        third-party cloud.</p>
+      <div class="actions">
+        <a class="btn btn-lg" href="#get-started">Get started</a>
+        <a class="btn btn-lg btn-secondary" href="{{ repository }}">View on GitHub</a>
+      </div>
+    </div>
+    <div class="chat" role="img" aria-label="Example: the assistant reads a spreadsheet stored on the NAS">
+      <p class="chat-msg chat-user">Which expenses went over budget in the Q3 sheet of the
+        <i>workspace</i> folder?</p>
+      <div class="chat-tool"><span>Used</span><code>drive_search_files</code><code>spreadsheet_read_sheet</code></div>
+      <div class="chat-msg chat-assistant">
+        In <b>budget-2026.osheet</b>, two lines are over budget for Q3:
+        <ul>
+          <li>Travel: 4,820 € spent for 3,500 € planned (+38 %)</li>
+          <li>Software: 2,140 € for 1,800 € (+19 %)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <section class="block" id="compare">
+    <div class="wrap">
+      <h2>Works like the connectors you already know</h2>
+      <p class="lead">Your assistant gets the same kind of access to your files as with a
+        cloud connector. The difference is where the files live and who runs the bridge.</p>
+      <table class="compare">
+        <thead>
+          <tr><th scope="col"></th><th scope="col">Cloud connectors (Google Drive, OneDrive)</th><th scope="col" class="us">syno-workspace-mcp</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Where your files live</th><td>On the provider's cloud</td><td class="us">On your Synology NAS</td></tr>
+          <tr><th scope="row">Who runs the connector</th><td>The provider</td><td class="us">You, in a Docker container on the NAS</td></tr>
+          <tr><th scope="row">What the assistant can open</th><td>What your account can open</td><td class="us">What a dedicated DSM account can open: the team folders you choose</td></tr>
+          <tr><th scope="row">Sign-in</th><td>Your provider account</td><td class="us">An access token generated on the NAS</td></tr>
+          <tr><th scope="row">Setup</th><td>A few clicks</td><td class="us">About 20 minutes in DSM, no terminal</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="block" id="features">
+    <div class="wrap">
+      <h2>What your assistant can do</h2>
+      <p class="lead">26 tools for Synology Drive and Synology Spreadsheet, available to any
+        AI assistant that speaks the Model Context Protocol (MCP).</p>
+      <div class="grid">
+        <div class="card"><span class="icon" aria-hidden="true">⌕</span><h3>Find files</h3>
+          <p>List folders, search by name or extension across your team folders, read file details.</p></div>
+        <div class="card"><span class="icon" aria-hidden="true">⇅</span><h3>Organize Drive</h3>
+          <p>Upload, download, create folders, move, rename, add labels and create sharing links.</p></div>
+        <div class="card"><span class="icon" aria-hidden="true">▦</span><h3>Read spreadsheets</h3>
+          <p>Read sheets with formula results, styles and metadata, or export a whole spreadsheet.</p></div>
+        <div class="card"><span class="icon" aria-hidden="true">✎</span><h3>Edit spreadsheets</h3>
+          <p>Create spreadsheets and sheets, write cells, append rows, apply styles.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="privacy">
+    <div class="wrap split">
+      <div>
+        <h2>Private and careful by design</h2>
+        <p class="lead">The server runs on your NAS and talks only to your own DSM. File contents
+          reach your assistant only when a tool returns them.</p>
+      </div>
+      <ul class="checklist">
+        <li><b>No third-party service.</b> No account to create, no telemetry.</li>
+        <li><b>Least privilege.</b> The server uses a dedicated DSM account that only gets the team folders you choose.</li>
+        <li><b>No surprise changes.</b> Tools that overwrite, rename or delete do nothing without an explicit confirmation.</li>
+        <li><b>HTTPS only.</b> Served behind the DSM reverse proxy, with your own certificate.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="block" id="get-started">
+    <div class="wrap split">
+      <div>
+        <h2>Get started in three steps</h2>
+        <ol class="steps-list">
+          <li><div><h3>Install it on the NAS</h3>
+            <p>Follow the <a href="{{ repository }}/blob/main/docs/install-container-manager.md">Container Manager guide</a>,
+              entirely in the DSM web interface.</p></div></li>
+          <li><div><h3>Run the setup page</h3>
+            <p>It prepares the DSM account and the team folder, then generates the access token.</p></div></li>
+          <li><div><h3>Connect your assistant</h3>
+            <p>One-click extension for Claude Desktop, one command for Claude Code, or the server
+              address and token for any MCP client that supports remote servers with a custom header.
+              <a href="{{ repository }}#connect-a-client">Client setup</a></p></div></li>
+        </ol>
+        <h3 style="margin-top: 2rem; font-size: 1rem;">Requirements</h3>
+        <p class="hint">DSM 7.2 or later with Container Manager, Synology Drive Server and Synology
+          Office, and an HTTPS address for the NAS with a valid certificate.</p>
+      </div>
+      <img class="shot" src="images/setup-summary.png" width="760" height="797"
+        alt="The setup page, last step: review of the address, DSM URL and DSM account before saving" loading="lazy">
+    </div>
+  </section>
+
+  <section class="block cta">
+    <div class="wrap">
+      <h2>Bring your NAS into the conversation</h2>
+      <p class="lead">Free and open source. Questions and ideas are welcome on GitHub.</p>
+      <div class="actions">
+        <a class="btn btn-lg" href="{{ repository }}/blob/main/docs/install-container-manager.md">Read the install guide</a>
+        <a class="btn btn-lg btn-secondary" href="{{ repository }}/releases/latest">Latest release</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <p>syno-workspace-mcp {{ version }} · MIT license · Python port of
+    <a href="https://github.com/vocweb/synology-mcp-server">vocweb/synology-mcp-server</a></p>
+  <p>Independent project, not affiliated with Synology, Google, Microsoft or Anthropic.
+    Product names are trademarks of their owners.</p>
+</footer>
+</body>
+</html>

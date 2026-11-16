@@ -23,3 +23,6 @@ data/
 # IDE / OS
 .idea/
 .DS_Store
+
+# Landing page build output
+_site/
