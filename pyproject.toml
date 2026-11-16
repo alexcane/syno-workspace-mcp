@@ -1,6 +1,6 @@
 [project]
 name = "syno-workspace-mcp"
-version = "1.1.0"
+version = "1.2.0"
 description = "MCP server for Synology Drive and Spreadsheet, built with FastMCP"
 readme = "README.md"
 license = "MIT"
