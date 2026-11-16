@@ -15,7 +15,12 @@ from starlette.testclient import TestClient
 from syno_workspace_mcp import persisted
 from syno_workspace_mcp.__main__ import main
 from syno_workspace_mcp.config import Settings
-from syno_workspace_mcp.setup.app import RateLimiter, create_setup_app, parse_mcp_url
+from syno_workspace_mcp.setup.app import (
+    RateLimiter,
+    create_setup_app,
+    normalize_code,
+    parse_mcp_url,
+)
 
 from .conftest import DSM_URL, TEST_PASSWORD, FakeDsm
 
@@ -250,6 +255,18 @@ def test_page_requires_https_through_the_proxy(tmp_path: Path) -> None:
         assert client.get("/health").json() == {"status": "setup"}
 
 
+@pytest.mark.parametrize(
+    "pasted",
+    [
+        "ABCD2345",
+        " abcd-2345 ",
+        "2026-11-16 10:02:32,903 WARNING syno_workspace_mcp: Setup code: ABCD2345",
+    ],
+)
+def test_normalize_code_accepts_the_whole_log_line(pasted: str) -> None:
+    assert normalize_code(pasted) == CODE
+
+
 def test_unlock_needs_the_code_and_is_rate_limited(page: TestClient) -> None:
     assert "Setup code" in page.get("/setup").text
     for _ in range(5):
@@ -314,6 +331,8 @@ def test_existing_account_then_save(
 
     token = re.search(r"<pre>([A-Za-z0-9_-]{40,})</pre>", done.text)
     assert token
+    # Option B does not know the team folders: Claude is asked to list them.
+    assert "List my Drive team folders." in done.text
     saved = persisted.load(tmp_path)
     assert saved["mcp_auth_token"] == token[1]
     assert saved["syno_password"] == TEST_PASSWORD
@@ -379,7 +398,8 @@ def test_prepare_folder_and_account(page: TestClient, fake_dsm: FakeDsm, tmp_pat
     assert "otp_code" not in fake_dsm.logins[1]
     assert len(fake_dsm.logouts) == 2
 
-    page.post("/setup/finish", data={"csrf": csrf})
+    done = page.post("/setup/finish", data={"csrf": csrf})
+    assert "List the files in my Drive team folder claude." in done.text
     saved = persisted.load(tmp_path)
     assert saved["syno_username"] == "mcp_service"
     assert saved["syno_password"] == TEST_PASSWORD

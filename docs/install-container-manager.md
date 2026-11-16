@@ -65,6 +65,8 @@ The compose file has a single value to fill in, `CHANGE_ME_SPREADSHEET_SECRET`:
 a random secret used only by the Spreadsheet container. Any length is fine
 (40 characters, for example), with letters, digits and hyphens only.
 
+- **Terminal** (Mac or Linux): `openssl rand -hex 20` prints a 40-character
+  secret made of digits and the letters a to f.
 - **Password manager**: create a 40-character password with symbols turned off.
 - **Passwords app on a Mac**: create a new password and copy the suggested
   strong password (for example `abcdef-ghijkl-mnopqr`).
@@ -96,7 +98,8 @@ Container Manager downloads the two images and starts two containers:
    - `setup mode (not configured yet, …): open https://<your NAS host>/setup …`
    - `Setup code: ABCD2345`
 
-Keep the 8-character code for step 7. It stays valid until setup is done; a
+Keep the 8-character code for step 7. The log view cannot select part of a
+line: copy the whole `Setup code` line, the setup page accepts it as is. It stays valid until setup is done; a
 restart of the container prints a new one.
 
 ## 6. Add a reverse proxy rule
@@ -127,7 +130,9 @@ port), then follow the four steps.
 2. **Exposure**: keep **Local network and VPN**. The suggested server address
    (`https://nas.example.com:3443/mcp`) is the one Claude will use: change it
    only if Claude reaches the NAS under another name.
-3. **DSM account**: under *Option A*, fill in:
+3. **DSM account**: *Option A* starts by recalling how to create the account
+   in DSM: you already did it in step 1, nothing to do there. Under *Option A*,
+   fill in:
    - **DSM address**: the address you use to open DSM over HTTPS, with its
      port, for example `https://nas.example.com:5001`.
    - **Account name** and **Password of this account**: `mcp_service` and the
@@ -152,7 +157,9 @@ The server then restarts with its configuration; `/setup` is no longer served
 
 ## 8. Test the address
 
-Open `https://nas.example.com:3443/health`. The page should show
+Keep the setup page open: the access token is shown only once. The setup page
+has a link that opens `https://nas.example.com:3443/health` in a new tab; you
+can also type that address in a new tab. The page should show
 `{"status":"ok"}` (`{"status":"setup"}` means the server is still in setup
 mode).
 
@@ -176,6 +183,21 @@ Use the server address and the access token shown at the end of step 7.
 - **Claude Code**: copy the `claude mcp add` command shown by the setup page, or
   see [Connect a client](../README.md#connect-a-client).
 
+## 10. Try it
+
+Start a new conversation in Claude and paste the prompt shown at the end of the
+setup page, for example:
+
+> Is the Synology MCP server set up correctly? List the files in my Drive team
+> folder claude.
+
+Claude should call `drive_list_files` (Claude Desktop may ask you to allow the
+tool first) and show the content of the team folder chosen in step 7 (empty for
+a new folder). You can also ask it to list your Drive team folders. If it
+says it has no Synology tools, check that the extension is enabled, or that
+`claude mcp list` shows the server as connected. Once this works, you can close
+the setup page: the installation is done.
+
 ## Run the setup again
 
 To get a new access token (a lost or leaked one), use another DSM account or
@@ -189,6 +211,10 @@ change the address:
    cannot use the server meanwhile.
 4. Put the `#` back in front of `SETUP_MODE`, save and rebuild. Otherwise the
    setup page comes back at each restart.
+5. Give the new token to every client: in Claude Desktop, update the
+   extension's settings; in Claude Code, run
+   `claude mcp remove synology --scope user` before the new `claude mcp add`
+   command (it refuses to add a server that already exists).
 
 Saving the YAML alone does not apply a change: the containers keep running with
 the old values until the project is rebuilt.

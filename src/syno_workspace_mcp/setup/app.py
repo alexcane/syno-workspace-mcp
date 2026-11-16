@@ -65,7 +65,12 @@ def generate_code() -> str:
 
 
 def normalize_code(value: str) -> str:
-    return re.sub(r"[\s-]", "", value).upper()
+    """Accept the code alone or the whole log line it was copied from.
+
+    Container Manager's log view cannot select part of a line, so users paste
+    `... WARNING syno_workspace_mcp: Setup code: ABCD2345`: keep what follows the last colon.
+    """
+    return re.sub(r"[\s-]", "", value.rpartition(":")[2]).upper()
 
 
 @dataclass
@@ -99,6 +104,8 @@ class SetupState:
     username: str | None = None
     password: SecretStr | None = None
     preparation: PreparationReport | None = None
+    # Team folders prepared by option A, for the "Try it" prompt; unknown with option B.
+    team_folders: list[str] = field(default_factory=list)
     error: str | None = None
     finished: bool = False
 
@@ -107,6 +114,7 @@ class SetupState:
         self.username = None
         self.password = None
         self.preparation = None
+        self.team_folders = []
         self.verify_tls = True
 
 
@@ -343,6 +351,7 @@ def create_setup_app(
             return back_to_setup()
         ctx.state.password = password
         ctx.state.preparation = None
+        ctx.state.team_folders = []
         return back_to_setup()
 
     async def dsm_prepare(request: Request) -> Response:
@@ -388,6 +397,9 @@ def create_setup_app(
         if report.complete:
             ctx.state.password = password
             ctx.state.preparation = None
+            ctx.state.team_folders = ([new_folder] if new_folder else []) + [
+                name for name in folders if name != new_folder
+            ]
             logger.info("DSM account %s prepared", username)
         else:
             ctx.state.preparation = report
@@ -434,7 +446,13 @@ def create_setup_app(
         )
         state.finished = True
         logger.info("configuration saved to %s; restarting", ctx.data_dir)
-        response = render("done.html", token=token, mcp_url=state.mcp_url, restarting=False)
+        response = render(
+            "done.html",
+            token=token,
+            mcp_url=state.mcp_url,
+            team_folders=state.team_folders,
+            restarting=False,
+        )
         response.background = BackgroundTask(ctx.on_finished)
         return response
 

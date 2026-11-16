@@ -12,6 +12,9 @@ this page is no longer available.</p></div>
   <div class="alert alert-warning"><p><b>Copy it now:</b> it is shown only once. To get a new one later,
   run the setup again.</p></div>
   <pre>{{ token }}</pre>
+  <p class="hint">Keep this page open until Claude is connected. To check that the server
+  restarted, open <a href="/health" target="_blank" rel="noopener">/health</a> in a new tab:
+  it shows <code>{"status":"ok"}</code> after a few seconds.</p>
 </section>
 
 <section class="card">
@@ -27,6 +30,20 @@ this page is no longer available.</p></div>
 <section class="card">
   <h2>Claude Code</h2>
   <pre>claude mcp add --scope user --transport http synology {{ mcp_url }} --header "Authorization: Bearer {{ token }}"</pre>
+</section>
+
+<section class="card">
+  <h2>Try it</h2>
+  <p>In a new conversation, ask Claude:</p>
+  {% if team_folders %}
+  <pre>Is the Synology MCP server set up correctly? List the files in my Drive team folder {{ team_folders[0] }}.</pre>
+  <p class="hint">Claude should list the files of <code>/team-folders/{{ team_folders[0] }}</code>
+  (empty for a new folder). Once it does, you can close this page.</p>
+  {% else %}
+  <pre>Is the Synology MCP server set up correctly? List my Drive team folders.</pre>
+  <p class="hint">Claude should list the team folders the account can open. Once it does,
+  you can close this page.</p>
+  {% endif %}
 </section>
 
 <p class="hint">If the container was started with <code>SETUP_MODE=true</code>, remove that
