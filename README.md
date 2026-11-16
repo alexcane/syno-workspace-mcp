@@ -13,14 +13,16 @@ MCP server for **Synology Drive** and **Synology Spreadsheet**, built with
 - The DSM reverse proxy terminates HTTPS and forwards to it.
 - Clients authenticate with a static bearer token (`MCP_AUTH_TOKEN`).
 - `GET /health` is unauthenticated and only returns `{"status": "ok"}`.
-- Host header validation: only loopback and `MCP_ALLOWED_HOSTS` are accepted
+- Host header validation: only loopback and `MCP_ALLOWED_HOSTS` (or the address
+  entered in `/setup`) are accepted
   (other hosts get `421`); browser requests from foreign origins get `403`.
 
 ## Install on a Synology NAS
 
 No terminal? Follow the step-by-step
 [Container Manager guide](docs/install-container-manager.md), done entirely in
-the DSM web interface.
+the DSM web interface: once the containers run, a `/setup` page served through
+the DSM reverse proxy prepares the DSM account and generates the access token.
 
 The commands below require Container Manager (Docker) and SSH access.
 
@@ -145,11 +147,6 @@ The server and the extension send nothing to third parties. The extension only
 talks to the server URL you enter; the server only talks to your own DSM and to
 the Spreadsheet container on the NAS. Files and spreadsheet contents go to Claude
 only when a tool returns them.
-
-## Roadmap
-
-- A `/setup` web page served by the server, to replace editing `.env` by hand
-  (exposure mode, creation of the dedicated DSM account, token generation).
 
 ## Releases
 

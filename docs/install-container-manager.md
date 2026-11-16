@@ -15,35 +15,29 @@ You need:
 - An HTTPS address for your NAS with a valid certificate, for example
   `nas.example.com` with a Let's Encrypt certificate
   (*Control Panel → Security → Certificate*). Claude will connect to it.
-- A way to generate random passwords: a password manager, or the *Passwords*
+- A way to generate a random password: a password manager, or the *Passwords*
   app on a Mac (see step 3).
 
 DSM may show these screens in your own language: the labels below are the
 English ones.
 
 The server is meant to be reached from your local network or through a VPN.
-Exposing it to the Internet is possible but not covered here: the access token
-would then be the only protection.
+The setup page also offers a public address, but the access token is then the
+only protection against the whole Internet.
 
 ## 1. Create a dedicated DSM account
 
-The server signs in to DSM with its own account, limited to Drive and Office.
+The server signs in to DSM with its own account. DSM only lets its own web
+interface create accounts, so this step is done by hand; the setup page (step 7)
+then gives the account what it needs.
 
 1. Open *Control Panel → User & Group → User* and click **Create**.
 2. *Enter user information*:
    - **Name**: `mcp_service`
    - **Password**: generate one with **Generate Random Password** or your
-     password manager, and keep it: you will paste it in step 4.
+     password manager, and keep it: you will paste it in step 7.
    - Tick **Disallow the user to change account password**.
-3. *Join groups*: keep the default `users` group.
-4. *Assign shared folders permissions*: tick **Read/Write** on each Drive team
-   folder the server should use (for example `labs`). Leave the other rows
-   unticked. Do not tick **No access** on a folder the server needs: it
-   overrides everything else.
-5. *Assign user quota*: leave as is.
-6. *Assign application permissions*: **Allow** *Synology Drive* and
-   *Synology Office*, **Deny** everything else.
-7. *Set user speed limit*: leave as is, then **Apply** on *Confirm settings*.
+3. Leave every other page as is, then **Apply** on *Confirm settings*.
 
 Do not enable two-factor authentication on this account: the server could no
 longer sign in.
@@ -61,30 +55,21 @@ longer sign in.
 4. Click **Done**, then **Save**.
 
 Why: the server runs in its container as a user that has no DSM account, so it
-needs this permission to save its data (the list of spreadsheet names you
-register). Nothing secret is stored in `data`.
+needs this permission to save its configuration. The file that holds the DSM
+password and the access token (`secrets.json`) is restricted to the server when
+it is written: the permission above does not apply to it.
 
-## 3. Prepare the values
+## 3. Generate the Spreadsheet secret
 
-Write these five values in a note before creating the project, then copy and
-paste them: retyping them is the most common source of mistakes.
+The compose file has a single value to fill in, `CHANGE_ME_SPREADSHEET_SECRET`:
+a random secret used only by the Spreadsheet container. Any length is fine
+(40 characters, for example), with letters, digits and hyphens only.
 
-| Placeholder | What to put |
-| --- | --- |
-| `CHANGE_ME_DSM_URL` | The address you use to open DSM over HTTPS, with its port, for example `https://nas.example.com:5001` |
-| `CHANGE_ME_DSM_PASSWORD` | The `mcp_service` password from step 1 |
-| `CHANGE_ME_SPREADSHEET_SECRET` | A random secret, any length (40 characters is fine) |
-| `CHANGE_ME_ACCESS_TOKEN` | Another random secret, **at least 32 characters**: Claude will use it to connect |
-| `CHANGE_ME_HOST_NAME` | The host name Claude will use, without `https://` or port, for example `nas.example.com` |
-
-The two secrets may only contain letters, digits and hyphens. To generate them:
-
-- **Password manager**: create a 48-character password with symbols turned off.
+- **Password manager**: create a 40-character password with symbols turned off.
 - **Passwords app on a Mac**: create a new password and copy the suggested
-  strong password (for example `abcdef-ghijkl-mnopqr`). It has 20 characters:
-  for the access token, paste two suggestions one after the other.
+  strong password (for example `abcdef-ghijkl-mnopqr`).
 
-If the DSM password contains a `$`, write it twice (`$$`).
+You will not need it again after step 4.
 
 ## 4. Create the project
 
@@ -93,9 +78,8 @@ If the DSM password contains a `$`, write it twice (`$$`).
 3. **Path**: select `/docker/syno-workspace-mcp`.
 4. **Source**: choose **Create docker-compose.yml**, then paste the content of
    [`deploy/container-manager/docker-compose.yml`](../deploy/container-manager/docker-compose.yml).
-5. Replace each of the five `CHANGE_ME_…` values with the matching value from
-   step 3, keeping the double quotes. Check that no `CHANGE_ME` is left and
-   that each value is on the right line.
+5. Replace `CHANGE_ME_SPREADSHEET_SECRET` with the secret from step 3, keeping
+   the double quotes.
 6. Click **Next**. Leave the Web Station portal disabled.
 7. Check the summary, tick the option to start the project once it is created,
    and click **Done**.
@@ -103,23 +87,22 @@ If the DSM password contains a `$`, write it twice (`$$`).
 Container Manager downloads the two images and starts two containers:
 `synology-spreadsheet-api` and `syno-workspace-mcp`.
 
-## 5. Check that it runs
+## 5. Find the setup code
 
 1. Open *Container Manager → Container*. Both containers should be running
    (green dot).
-2. Open `syno-workspace-mcp`. After a minute its status shows **Healthy**. In
-   the **Log** tab, you should see a line containing
-   `Uvicorn running on http://127.0.0.1:3100`.
+2. Open `syno-workspace-mcp`, then its **Log** tab. Since nothing is configured
+   yet, the server starts in setup mode and prints two lines:
+   - `setup mode (not configured yet, …): open https://<your NAS host>/setup …`
+   - `Setup code: ABCD2345`
 
-If the container stops and its log starts with `Invalid configuration:`, the
-next lines name each wrong value, for example
-`MCP_ALLOWED_HOSTS: Value error, still holds a CHANGE_ME placeholder`. Fix them
-as described in [Change a value](#change-a-value).
+Keep the 8-character code for step 7. It stays valid until setup is done; a
+restart of the container prints a new one.
 
 ## 6. Add a reverse proxy rule
 
 The server only listens inside the NAS. DSM's reverse proxy publishes it over
-HTTPS.
+HTTPS, for the setup page now and for Claude afterwards.
 
 1. Open *Control Panel → Login Portal → Advanced → Reverse Proxy* and click
    **Create**.
@@ -135,55 +118,106 @@ HTTPS.
 Make sure the certificate covering your host name is used for this rule
 (*Control Panel → Security → Certificate → Settings*).
 
-## 7. Test the address
+## 7. Run the setup page
 
-Open `https://nas.example.com:3443/health` in a browser (with your host name and
-port). The page should show `{"status":"ok"}`.
+Open `https://nas.example.com:3443/setup` in a browser (with your host name and
+port), then follow the four steps.
+
+1. **Access**: enter the setup code from step 5.
+2. **Exposure**: keep **Local network and VPN**. The suggested server address
+   (`https://nas.example.com:3443/mcp`) is the one Claude will use: change it
+   only if Claude reaches the NAS under another name.
+3. **DSM account**: under *Option A*, fill in:
+   - **DSM address**: the address you use to open DSM over HTTPS, with its
+     port, for example `https://nas.example.com:5001`.
+   - **Account name** and **Password of this account**: `mcp_service` and the
+     password from step 1.
+   - **Folder Claude will work in**: a new team folder (`claude` by default),
+     or the names of existing Drive team folders, for example `labs`.
+   - **Administrator account**, its password, and its two-factor code if it
+     uses one.
+
+   Click **Prepare the account**. The page creates the folder if needed and
+   enables it as a Drive team folder, gives `mcp_service` read/write access to
+   the folders, allows Synology Drive, and tests the login. The administrator
+   credentials are used once and not stored. If a step fails, the page lists
+   what was done: fix the problem and submit again.
+
+   *Option B* skips all this for an account you already set up yourself.
+4. **Summary**: click **Save**. The page shows the **access token** once, with
+   the settings for Claude Desktop and Claude Code: copy it now.
+
+The server then restarts with its configuration; `/setup` is no longer served
+(`404`).
+
+## 8. Test the address
+
+Open `https://nas.example.com:3443/health`. The page should show
+`{"status":"ok"}` (`{"status":"setup"}` means the server is still in setup
+mode).
 
 | You see | Likely cause |
 | --- | --- |
-| `421 Misdirected Request` | `MCP_ALLOWED_HOSTS` does not match the host name in the address |
+| `421 Misdirected Request` | The host name in the address is not the one entered in step 7 (*Exposure*) |
 | `502 Bad Gateway` | The `syno-workspace-mcp` container is not running (step 5) |
 | Connection refused | The reverse proxy rule was not saved, or uses another port (step 6) |
 | Other connection error | The computer is not on the NAS network / VPN |
+| `Open this page over HTTPS` on `/setup` | The page was opened over HTTP or without the reverse proxy |
 
-## 8. Connect Claude
+If the container stops and its log starts with `Invalid configuration:`, the
+next lines name each wrong value.
 
-Your server URL is `https://nas.example.com:3443/mcp` and the access token is
-the `MCP_AUTH_TOKEN` value.
+## 9. Connect Claude
+
+Use the server address and the access token shown at the end of step 7.
 
 - **Claude Desktop**: install the extension, see
   [Claude Desktop extension](../README.md#claude-desktop-extension).
-- **Claude Code**: see [Connect a client](../README.md#connect-a-client).
+- **Claude Code**: copy the `claude mcp add` command shown by the setup page, or
+  see [Connect a client](../README.md#connect-a-client).
 
-## Change a value
+## Run the setup again
+
+To get a new access token (a lost or leaked one), use another DSM account or
+change the address:
 
 1. Open *Container Manager → Project → syno-workspace-mcp → YAML
-   Configurations* and edit the value.
-2. Save. Container Manager offers to rebuild the project: accept (**Build**).
-3. Click **Start** if the project does not start by itself.
+   Configurations*, and remove the `#` in front of `SETUP_MODE: "true"`.
+2. Save. Container Manager offers to rebuild the project: accept (**Build**),
+   then click **Start** if the project does not start by itself.
+3. Take the new setup code from the log (step 5) and run step 7 again. Claude
+   cannot use the server meanwhile.
+4. Put the `#` back in front of `SETUP_MODE`, save and rebuild. Otherwise the
+   setup page comes back at each restart.
 
-Saving alone does not apply the change: the containers keep running with the
-old values until the project is rebuilt.
+Saving the YAML alone does not apply a change: the containers keep running with
+the old values until the project is rebuilt.
 
 ## Update to a new version
 
 Change the version at the end of `image: ghcr.io/alexcane/syno-workspace-mcp:…`
 to the new one from the
-[releases page](https://github.com/alexcane/syno-workspace-mcp/releases), as in
-[Change a value](#change-a-value). Container Manager downloads the new image.
-Your values and the `data` folder are kept.
+[releases page](https://github.com/alexcane/syno-workspace-mcp/releases), in
+*YAML Configurations*, then save and rebuild as above. Container Manager
+downloads the new image. The `data` folder, and with it the configuration, is
+kept.
+
+An installation made with an earlier version of this guide (values typed in the
+YAML) keeps working: values in the YAML take precedence over the setup page.
 
 ## Security notes
 
-- Container Manager stores the project in `/docker/syno-workspace-mcp/compose.yaml`,
-  which holds the DSM password and the access token. By default every DSM user
-  may be able to read the `docker` shared folder: check its permissions in
+- Container Manager stores the project in `/docker/syno-workspace-mcp/compose.yaml`.
+  It only holds the Spreadsheet secret; the DSM password and the access token
+  are in `data/secrets.json`, readable by the server only. By default every DSM
+  user may be able to read the `docker` shared folder: check its permissions in
   *Control Panel → Shared Folder → docker → Edit → Permissions*. Never tick
   **No access** for the `users` group: every account belongs to it, so that
   would lock out administrators too.
 - Anyone with the access token can read, change and delete files the
-  `mcp_service` account can reach. If it leaks, replace it in *YAML
-  Configurations*, save, and update it in Claude.
+  `mcp_service` account can reach. If it leaks, run the setup again and update
+  the token in Claude.
+- While in setup mode, the setup page is protected by the setup code, which
+  only appears in the container log: run the setup soon after starting it.
 - Tools that overwrite, rename or delete do nothing unless Claude calls them
   with `confirm: true`.
