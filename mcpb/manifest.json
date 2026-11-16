@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "syno-workspace-mcp",
   "display_name": "Synology Drive & Spreadsheet",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Connects Claude to Synology Drive and Synology Spreadsheet through your own syno-workspace-mcp server.",
   "long_description": "Bridge to a syno-workspace-mcp server running on your Synology NAS. Enter the server URL (for example https://nas.example.com:3443/mcp) and the access token (MCP_AUTH_TOKEN) set on the server. Tools that overwrite, rename or delete do nothing unless called with confirm: true.",
   "author": {
