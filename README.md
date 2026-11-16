@@ -4,6 +4,8 @@ Lets your AI assistant (Claude, ChatGPT, etc.) browse, read and edit the files
 and spreadsheets of your own **Synology Drive** and **Synology Spreadsheet**. The
 server runs in Docker on your NAS; nothing goes through a third-party service.
 
+**Project page:** [alexcane.github.io/syno-workspace-mcp](https://alexcane.github.io/syno-workspace-mcp/)
+
 > **Status: v1.** 11 Drive and 15 Spreadsheet tools. Tools that overwrite,
 > rename or delete do nothing unless called with `confirm: true`.
 
