@@ -1,0 +1,9 @@
+  <label>DSM address
+    <input type="url" name="dsm_url" value="{{ suggested_dsm_url }}" required>
+  </label>
+  <p class="hint">The address you use to open DSM over HTTPS, with its port.</p>
+  <label class="inline"><input type="checkbox" name="verify_tls" value="yes" {% if state.verify_tls %}checked{% endif %}>
+    <span>Check the DSM certificate (untick only for a self-signed certificate)</span></label>
+  <label>Account name for the server
+    <input type="text" name="username" value="{{ default_account }}" required>
+  </label>

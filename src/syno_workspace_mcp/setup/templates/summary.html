@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block steps %}<p class="steps">1. Access · 2. Exposure · 3. DSM account · <b>4. Summary</b></p>{% endblock %}
+{% block content %}
+<p class="ok">DSM accepted the account.</p>
+<dl>
+  <dt>Exposure</dt><dd>{{ "Public address" if state.exposure == "public" else "Local network and VPN" }}</dd>
+  <dt>Address for Claude</dt><dd>{{ state.mcp_url }}</dd>
+  <dt>DSM</dt><dd>{{ state.dsm_url }}{% if not state.verify_tls %} (certificate not checked){% endif %}</dd>
+  <dt>DSM account</dt><dd>{{ state.username }}</dd>
+</dl>
+<p><b>Save</b> generates the access token for Claude, shows it once, writes the
+configuration and restarts the server.</p>
+<form method="post" action="/setup/finish">
+  <input type="hidden" name="csrf" value="{{ state.csrf }}">
+  <button type="submit">Save</button>
+</form>
+<form method="post" action="/setup/restart">
+  <input type="hidden" name="csrf" value="{{ state.csrf }}">
+  <button type="submit" class="secondary">Start over from step 2</button>
+</form>
+{% endblock %}

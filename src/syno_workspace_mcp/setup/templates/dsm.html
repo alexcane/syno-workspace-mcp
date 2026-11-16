@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block steps %}<p class="steps">1. Access · 2. Exposure · <b>3. DSM account</b> · 4. Summary</p>{% endblock %}
+{% block content %}
+<p>The server signs in to DSM with its own account, limited to Synology Drive.</p>
+
+{% if preparation %}
+<div class="warning">
+  <p><b>The previous attempt stopped half-way.</b> Done for <code>{{ preparation.username }}</code>:</p>
+  <ul>
+    {% if preparation.new_folder %}
+    <li>Shared folder <code>{{ preparation.new_folder }}</code> created: {{ "yes" if preparation.folder_created else "no" }}</li>
+    <li>Enabled as Drive team folder: {{ "yes" if preparation.folder_enabled else "no" }}</li>
+    {% endif %}
+    <li>Folder access granted: {{ "yes" if preparation.folders_granted else "no" }}</li>
+    <li>Synology Drive allowed: {{ "yes" if preparation.drive_allowed else "no" }}</li>
+    <li>Account login tested: {{ "yes" if preparation.account_checked else "no" }}</li>
+  </ul>
+  <p>Fix the problem and submit again: every step can safely run twice.</p>
+</div>
+{% endif %}
+
+<h2>Option A: prepare a new account (recommended)</h2>
+<p>DSM only lets its own web interface create accounts, so start there:</p>
+<ol>
+  <li>In DSM, open <b>Control Panel → User &amp; Group → User → Create</b>.</li>
+  <li>Name it <code>{{ default_account }}</code>, give it a strong password, tick
+  <b>Disallow the user to change account password</b>, and leave every other page as is.</li>
+</ol>
+<p class="hint">This page then uses an administrator account once to create the folder
+Claude will work in (if needed), give the new account read/write access to it, allow
+Synology Drive, and test the login. The administrator credentials are not stored.</p>
+<form method="post" action="/setup/dsm/prepare" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ state.csrf }}">
+  {% include "_dsm_fields.html" %}
+  <label for="new_password">Password of this account</label>
+  <input type="password" id="new_password" name="password" autocomplete="off" required>
+  <fieldset>
+    <legend>Folder Claude will work in</legend>
+    <label class="inline"><input type="radio" name="folder_mode" value="new" checked>
+      <span><b>Create a new team folder</b></span></label>
+    <label for="new_folder">Folder name</label>
+    <input type="text" id="new_folder" name="new_folder" value="{{ (preparation.new_folder if preparation else none) or 'claude' }}" maxlength="32">
+    <p class="hint">Created as a shared folder on the first volume and enabled as a
+    Synology Drive team folder. If it already exists, it is reused.</p>
+    <label class="inline"><input type="radio" name="folder_mode" value="existing">
+      <span><b>Only use existing team folders</b></span></label>
+    <label for="team_folders">Other existing team folders (optional)</label>
+    <input type="text" id="team_folders" name="team_folders" placeholder="labs, projects">
+    <p class="hint">Comma-separated names, as shown in the Synology Drive Admin Console.</p>
+  </fieldset>
+  <label for="admin_username">Administrator account</label>
+  <input type="text" id="admin_username" name="admin_username" autocomplete="off" required>
+  <label for="admin_password">Administrator password</label>
+  <input type="password" id="admin_password" name="admin_password" autocomplete="off" required>
+  <label for="otp_code">Two-factor code (if the administrator uses 2FA)</label>
+  <input type="text" id="otp_code" name="otp_code" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
+  <button type="submit">Prepare the account</button>
+</form>
+
+<h2>Option B: use an account that is already set up</h2>
+<p class="hint">The account must be allowed to use Synology Drive, with read/write
+access to its team folders, and must not use two-factor authentication.</p>
+<form method="post" action="/setup/dsm/check" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ state.csrf }}">
+  {% include "_dsm_fields.html" %}
+  <label for="password">Account password</label>
+  <input type="password" id="password" name="password" autocomplete="off" required>
+  <button type="submit">Test and continue</button>
+</form>
+
+<form method="post" action="/setup/restart">
+  <input type="hidden" name="csrf" value="{{ state.csrf }}">
+  <button type="submit" class="secondary">Back to step 2</button>
+</form>
+{% endblock %}

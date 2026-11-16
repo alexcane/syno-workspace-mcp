@@ -84,9 +84,12 @@ class DsmClient:
         *,
         verify_tls: bool = True,
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
+        otp_code: str | None = None,
     ) -> None:
         self._username = username
         self._password = password
+        # One-time 2FA code: only valid for the first login (used by /setup).
+        self._otp_code = otp_code
         self._http = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
             verify=verify_tls,
@@ -125,6 +128,10 @@ class DsmClient:
         return await self._with_session(
             lambda session: self._send(api, query, session, http_method)
         )
+
+    async def login(self) -> None:
+        """Open the session now, raising `DsmAuthError` if DSM refuses the credentials."""
+        await self._get_session()
 
     async def upload(
         self,
@@ -214,6 +221,9 @@ class DsmClient:
             "format": "sid",
             "enable_syno_token": "yes",
         }
+        if self._otp_code:
+            form["otp_code"] = self._otp_code
+            self._otp_code = None
         payload = await self._post_json(AUTH_PATH, form, AUTH_API)
         if not payload.get("success"):
             code = _error_code(payload)
