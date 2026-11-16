@@ -50,9 +50,11 @@ longer sign in.
 3. Right-click `data` → **Properties** → **Permission** tab → **Create**:
    - **User or group**: `Everyone`
    - **Type**: Allow
-   - **Apply to**: This folder, Child folders, Child files
+   - **Apply to**: All (this folder, child folders and child files)
    - **Permission**: tick **Read** and **Write**
 4. Click **Done**, then **Save**.
+
+<img src="images/cm-data-permission.png" alt="Permission Editor: Everyone, Allow, Apply to All, Read and Write ticked" width="600">
 
 Why: the server runs in its container as a user that has no DSM account, so it
 needs this permission to save its configuration. The file that holds the DSM
@@ -82,12 +84,18 @@ You will not need it again after step 4.
    [`deploy/container-manager/docker-compose.yml`](../deploy/container-manager/docker-compose.yml).
 5. Replace `CHANGE_ME_SPREADSHEET_SECRET` with the secret from step 3, keeping
    the double quotes.
+
+   <img src="images/cm-project-yaml.png" alt="Create Project: the pasted compose file, with CHANGE_ME_SPREADSHEET_SECRET highlighted" width="600">
 6. Click **Next**. Leave the Web Station portal disabled.
 7. Check the summary, tick the option to start the project once it is created,
    and click **Done**.
 
+   <img src="images/cm-project-summary.png" alt="Create Project summary with Start the project once it is created ticked" width="600">
+
 Container Manager downloads the two images and starts two containers:
 `synology-spreadsheet-api` and `syno-workspace-mcp`.
+
+<img src="images/cm-project-running.png" alt="The syno-workspace-mcp project with its two containers running" width="600">
 
 ## 5. Find the setup code
 
@@ -98,9 +106,11 @@ Container Manager downloads the two images and starts two containers:
    - `setup mode (not configured yet, …): open https://<your NAS host>/setup …`
    - `Setup code: ABCD2345`
 
+   <img src="images/cm-setup-code.png" alt="Log tab of the syno-workspace-mcp container, showing the Setup code line" width="600">
+
 Keep the 8-character code for step 7. The log view cannot select part of a
-line: copy the whole `Setup code` line, the setup page accepts it as is. It stays valid until setup is done; a
-restart of the container prints a new one.
+line: copy the whole `Setup code` line, the setup page accepts it as is. It
+stays valid until setup is done; a restart of the container prints a new one.
 
 ## 6. Add a reverse proxy rule
 
@@ -113,9 +123,14 @@ HTTPS, for the setup page now and for Claude afterwards.
 3. **Source**: Protocol `HTTPS`, Hostname `nas.example.com` (your host name),
    Port `3443` (any free port).
 4. **Destination**: Protocol `HTTP`, Hostname `localhost`, Port `3100`.
-5. **Advanced Settings**: set **Proxy send timeout** and **Proxy read
-   timeout** to `3600` (Claude keeps a connection open), and **Proxy HTTP
-   version** to `HTTP 1.1`.
+
+   <img src="images/proxy-general.png" alt="Reverse Proxy Rules, General tab: HTTPS nas.example.com 3443 to HTTP localhost 3100" width="600">
+5. **Advanced Settings**: set **Proxy connection timeout**, **Proxy send
+   timeout** and **Proxy read timeout** to `3600` (Claude keeps a connection
+   open), and **Proxy HTTP version** to `HTTP 1.1`.
+
+   <img src="images/proxy-advanced.png" alt="Reverse Proxy Rules, Advanced Settings tab: timeouts 3600, HTTP 1.1" width="600">
+
 6. Click **Save**, and check that the rule now appears in the list.
 
 Make sure the certificate covering your host name is used for this rule
@@ -127,9 +142,13 @@ Open `https://nas.example.com:3443/setup` in a browser (with your host name and
 port), then follow the four steps.
 
 1. **Access**: enter the setup code from step 5.
+
+   <img src="images/setup-unlock.png" alt="Setup page, step 1: setup code field" width="480">
 2. **Exposure**: keep **Local network and VPN**. The suggested server address
    (`https://nas.example.com:3443/mcp`) is the one Claude will use: change it
    only if Claude reaches the NAS under another name.
+
+   <img src="images/setup-exposure.png" alt="Setup page, step 2: Local network and VPN selected, server address" width="480">
 3. **DSM account**: *Option A* starts by recalling how to create the account
    in DSM: you already did it in step 1, nothing to do there. Under *Option A*,
    fill in:
@@ -149,8 +168,14 @@ port), then follow the four steps.
    what was done: fix the problem and submit again.
 
    *Option B* skips all this for an account you already set up yourself.
+
+   <img src="images/setup-dsm.png" alt="Setup page, step 3: Option A form and Option B" width="480">
 4. **Summary**: click **Save**. The page shows the **access token** once, with
    the settings for Claude Desktop and Claude Code: copy it now.
+
+   <img src="images/setup-summary.png" alt="Setup page, step 4: summary before saving" width="480">
+
+   <img src="images/setup-done.png" alt="Setup page after saving: access token, Claude Desktop and Claude Code settings, Try it prompt" width="480">
 
 The server then restarts with its configuration; `/setup` is no longer served
 (`404`).
