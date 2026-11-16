@@ -19,7 +19,7 @@ services:
       PORT: "3000"
 
   mcp:
-    image: ghcr.io/alexcane/syno-workspace-mcp:1.2.0
+    image: ghcr.io/alexcane/syno-workspace-mcp:1.2.1
     container_name: syno-workspace-mcp
     # Also restarts the server once /setup has saved the configuration.
     restart: unless-stopped
